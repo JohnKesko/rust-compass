@@ -13,3 +13,7 @@ test-workspace/**
 img/*.mov
 node_modules/**
 bun.lock
+out/test/**
+out/*.old.js
+out/*.new.js
+img/icon.png
