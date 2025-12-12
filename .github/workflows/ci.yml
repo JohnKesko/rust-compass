@@ -51,4 +51,4 @@ jobs:
         run: npm ci
       
       - name: Publish to Marketplace
-        run: npx @vscode/vsce publish -p ${{ secrets.VSCE_PAT }}
+        run: npx @vscode/vsce publish -p ${{ secrets.VSC_PERSONAL_TOKEN }}
