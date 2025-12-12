@@ -1,6 +1,11 @@
 # Rust Compass
 
+**Experimental**.  
+The extension is in alpha.
+
 Contextual Rust guidance for VS Code. Get explanations from official documentation while you code.
+
+---
 
 ## Overview
 
