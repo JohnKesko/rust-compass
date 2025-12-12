@@ -3,6 +3,7 @@
 
 *.vsix
 bun.lock
+package-lock.json
 
 out
 dist
