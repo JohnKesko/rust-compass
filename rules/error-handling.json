@@ -1,0 +1,130 @@
+{
+    "category": "Error Handling",
+    "rules": [
+        {
+            "id": "unwrap-usage",
+            "pattern": "\\.unwrap\\(\\)",
+            "title": "Panicking on None/Err",
+            "rustTerm": "unwrap() panics",
+            "officialDoc": "https://doc.rust-lang.org/std/option/enum.Option.html#method.unwrap",
+            "explanation": "`.unwrap()` panics if the value is `None` or `Err`. Use `?` operator, `.expect()`, or pattern matching for safer handling.",
+            "example": "// Instead of:\nlet val = result.unwrap();\n\n// Use ? in functions returning Result:\nlet val = result?;\n\n// Or handle explicitly:\nlet val = match result {\n    Ok(v) => v,\n    Err(e) => return Err(e.into()),\n};",
+            "deepExplanation": "## The Problem with `.unwrap()`\n\n`.unwrap()` causes a **panic** if the value is `None` or `Err`. Panics crash your program (or thread).\n\n### Safer Alternatives\n\n**1. The `?` operator (recommended)**\n```rust\nfn read_config() -> Result<Config, Error> {\n    let content = fs::read_to_string(\"config.toml\")?;\n    let config = parse(&content)?;\n    Ok(config)\n}\n```\n\n**2. `.expect()` for documented panics**\n```rust\n// At least documents WHY it should never fail\nlet home = env::var(\"HOME\")\n    .expect(\"HOME environment variable must be set\");\n```\n\n**3. Pattern matching for recovery**\n```rust\nmatch file.read() {\n    Ok(data) => process(data),\n    Err(e) => {\n        eprintln!(\"Warning: {}\", e);\n        use_default()\n    }\n}\n```\n\n**4. `.unwrap_or()` / `.unwrap_or_default()`**\n```rust\nlet port = env::var(\"PORT\")\n    .unwrap_or(\"8080\".to_string());\n```\n\n### When `.unwrap()` is okay\n- Tests and examples\n- Cases proven impossible at compile time\n- Prototyping (replace before shipping)",
+            "confidence": 0.9,
+            "contexts": [
+                "general",
+                "parser",
+                "web",
+                "cli"
+            ],
+            "suggestedFix": {
+                "description": "Add context with .expect(\"reason\")",
+                "before": ".unwrap()",
+                "after": ".expect(\"TODO: add reason\")"
+            }
+        },
+        {
+            "id": "expect-usage",
+            "pattern": "\\.expect\\(",
+            "title": "Documented Panic",
+            "rustTerm": "expect() with message",
+            "officialDoc": "https://doc.rust-lang.org/std/option/enum.Option.html#method.expect",
+            "explanation": "`.expect(\"message\")` is better than `.unwrap()` as it documents why the panic should never happen. Still panics though!",
+            "example": "// Good: documents the assumption\nlet config = Config::load()\n    .expect(\"config.toml must exist in project root\");",
+            "deepExplanation": "## `.expect()` vs `.unwrap()`\n\nBoth panic, but `.expect()` adds context:\n\n```rust\n// Unhelpful panic message\nvalue.unwrap()\n// \"called `Option::unwrap()` on a `None` value\"\n\n// Helpful panic message  \nvalue.expect(\"user ID should exist after login\")\n// \"user ID should exist after login\"\n```\n\n### Best Practices\n\n1. **Document the invariant**\n```rust\nlet first = items.first()\n    .expect(\"items vec is never empty after init\");\n```\n\n2. **Explain what went wrong**\n```rust\nlet port: u16 = env::var(\"PORT\")\n    .expect(\"PORT env var not set\")\n    .parse()\n    .expect(\"PORT must be a valid u16\");\n```\n\n### Still prefer `?` when possible\n`.expect()` is for cases where:\n- Failure is truly unexpected/impossible\n- You're in `main()` or a context without `Result`\n- The panic message helps debugging",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "question-mark-operator",
+            "pattern": "\\?;|\\?\\s*$|\\?\\)",
+            "title": "Error Propagation",
+            "rustTerm": "? operator",
+            "explanation": "The `?` operator propagates errors up the call stack. Your function must return `Result<T, E>` or `Option<T>` to use it.",
+            "example": "fn load_data() -> Result<Data, Error> {\n    let file = File::open(\"data.txt\")?; // Returns Err if fails\n    let data = parse(file)?;\n    Ok(data)\n}",
+            "suggestedFix": {
+                "description": "Handle error with match instead",
+                "before": "?",
+                "after": ".map_err(|e| /* handle error */)?"
+            },
+            "deepExplanation": "## The `?` Operator\n\nThe `?` operator is Rust's way of propagating errors without boilerplate.\n\n### What it does\n```rust\n// This:\nlet val = something()?;\n\n// Is equivalent to:\nlet val = match something() {\n    Ok(v) => v,\n    Err(e) => return Err(e.into()),\n};\n```\n\n### Requirements\nYour function must return `Result` or `Option`:\n```rust\n// ✅ Works\nfn process() -> Result<(), Error> {\n    let data = load()?;\n    Ok(())\n}\n\n// ❌ Won't compile  \nfn process() {\n    let data = load()?; // Error: can't use ? here\n}\n```\n\n### For `main()`\n```rust\nfn main() -> Result<(), Box<dyn Error>> {\n    let config = load_config()?;\n    run(config)?;\n    Ok(())\n}\n```\n\n### Chaining\n```rust\nlet data = File::open(path)?\n    .read_to_string(&mut buf)?;\n```",
+            "confidence": 0.3,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "result-option",
+            "pattern": "Result<|Option<",
+            "title": "Result and Option Types",
+            "rustTerm": "Result<T,E> and Option<T>",
+            "officialDoc": "https://doc.rust-lang.org/std/result/enum.Result.html",
+            "explanation": "`Option` is for values that might not exist. `Result` is for operations that might fail. Both force you to handle the cases.",
+            "example": "// Option: value might not exist\nfn find_user(id: u32) -> Option<User> { ... }\n\n// Result: operation might fail\nfn load_file(path: &str) -> Result<String, io::Error> { ... }",
+            "deepExplanation": "## Option vs Result\n\n### Option<T>\nFor values that might be absent:\n```rust\nenum Option<T> {\n    Some(T),\n    None,\n}\n\nlet user = users.get(id);  // Option<&User>\nmatch user {\n    Some(u) => println!(\"Found: {}\", u.name),\n    None => println!(\"Not found\"),\n}\n```\n\n### Result<T, E>\nFor operations that might fail:\n```rust\nenum Result<T, E> {\n    Ok(T),\n    Err(E),\n}\n\nlet file = File::open(\"data.txt\");  // Result<File, io::Error>\nmatch file {\n    Ok(f) => read(f),\n    Err(e) => eprintln!(\"Error: {}\", e),\n}\n```\n\n### Converting Between Them\n```rust\n// Option -> Result\nlet val = opt.ok_or(\"missing value\")?;\nlet val = opt.ok_or_else(|| make_error())?;\n\n// Result -> Option\nlet val = result.ok();  // Discards error\n```\n\n### When to Use Which\n| Situation | Use |\n|-----------|-----|\n| Value might not exist | `Option` |\n| Operation can fail | `Result` |\n| Need error details | `Result` |\n| Just need presence check | `Option` |",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "map-and-then",
+            "pattern": "\\.map\\(|\\.and_then\\(",
+            "title": "Transforming Option/Result",
+            "rustTerm": "map and and_then",
+            "explanation": "`.map()` transforms the inner value. `.and_then()` chains operations that might also fail. Avoid nested `match` statements.",
+            "example": "// map: transform the value\nlet len = some_string.map(|s| s.len());\n\n// and_then: chain fallible operations\nlet parsed = input\n    .parse::<i32>().ok()\n    .and_then(|n| checked_double(n));",
+            "suggestedFix": {
+                "description": "Chain with and_then for fallible ops",
+                "before": ".map(",
+                "after": ".and_then("
+            },
+            "deepExplanation": "## Transforming Option and Result\n\n### `.map()` - Transform the Success Value\n```rust\nlet num: Option<i32> = Some(5);\nlet doubled = num.map(|n| n * 2);  // Some(10)\n\nlet result: Result<i32, Error> = Ok(5);\nlet doubled = result.map(|n| n * 2);  // Ok(10)\n```\n\n### `.and_then()` - Chain Fallible Operations\n```rust\n// Each step might fail\nfn parse_and_double(s: &str) -> Option<i32> {\n    s.parse::<i32>().ok()     // Option<i32>\n        .and_then(|n| n.checked_mul(2))  // Might overflow\n}\n```\n\n### Comparison\n```rust\n// map: A -> B (can't fail)\n// and_then: A -> Option<B> (can fail)\n\nlet x: Option<String> = Some(\"42\".to_string());\n\nx.map(|s| s.len())           // Some(2) - always works\nx.and_then(|s| s.parse().ok()) // Some(42) - might fail\n```\n\n### Chaining\n```rust\nlet result = get_config()\n    .and_then(|c| parse_config(c))\n    .map(|c| c.port)\n    .unwrap_or(8080);\n```",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "unwrap-or-default",
+            "pattern": "\\.unwrap_or\\(|\\.unwrap_or_else\\(|\\.unwrap_or_default\\(",
+            "title": "Safe Unwrapping with Defaults",
+            "rustTerm": "unwrap_or variants",
+            "explanation": "These provide fallback values instead of panicking. Use `.unwrap_or()` for simple defaults, `.unwrap_or_else()` for computed defaults.",
+            "example": "// Simple default\nlet port = config.port.unwrap_or(8080);\n\n// Computed default (lazy)\nlet data = cache.get(key)\n    .unwrap_or_else(|| expensive_compute());\n\n// Type's default\nlet items: Vec<_> = opt.unwrap_or_default();",
+            "deepExplanation": "## Safe Unwrapping\n\n### `.unwrap_or(default)`\nProvide a fixed fallback:\n```rust\nlet name = user.name.unwrap_or(\"Anonymous\".to_string());\nlet port = env_port.unwrap_or(8080);\n```\n\n### `.unwrap_or_else(|| ...)`\nCompute fallback lazily (only if needed):\n```rust\nlet data = cache.get(key)\n    .unwrap_or_else(|| {\n        // Only runs if cache miss\n        expensive_database_query()\n    });\n```\n\n### `.unwrap_or_default()`\nUse the type's `Default` implementation:\n```rust\nlet count: i32 = maybe_count.unwrap_or_default();  // 0\nlet items: Vec<_> = maybe_items.unwrap_or_default();  // []\nlet text: String = maybe_text.unwrap_or_default();  // \"\"\n```\n\n### When to Use Each\n| Method | Use When |\n|--------|----------|\n| `unwrap_or(val)` | Default is cheap/simple |\n| `unwrap_or_else(fn)` | Default is expensive to compute |\n| `unwrap_or_default()` | Type has sensible Default |",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "map-err",
+            "pattern": "\\.map_err\\(",
+            "title": "Transforming Errors",
+            "rustTerm": "map_err",
+            "explanation": "`.map_err()` transforms the error type, useful when you need to convert between error types or add context.",
+            "example": "fs::read_to_string(path)\n    .map_err(|e| MyError::IoError(path.to_string(), e))?",
+            "deepExplanation": "## Transforming Errors with map_err\n\n### Basic Usage\n```rust\n// Convert io::Error to our custom error\nlet content = fs::read_to_string(path)\n    .map_err(|e| AppError::FileNotFound(e))?;\n```\n\n### Adding Context\n```rust\nlet config = fs::read_to_string(\"config.toml\")\n    .map_err(|e| format!(\"Failed to read config: {}\", e))?;\n```\n\n### Converting Error Types\n```rust\n// When your function returns a different error type\nfn process() -> Result<(), AppError> {\n    let n: i32 = \"42\".parse()\n        .map_err(|_| AppError::InvalidNumber)?;\n    Ok(())\n}\n```\n\n### vs From trait\n```rust\n// If you implement From, ? converts automatically\nimpl From<io::Error> for AppError {\n    fn from(e: io::Error) -> Self {\n        AppError::Io(e)\n    }\n}\n\n// Now this works without map_err:\nlet file = File::open(path)?;  // Auto-converts\n```\n\n### Chaining\n```rust\nread_file(path)\n    .map_err(|e| e.add_context(\"reading config\"))?\n    .parse()\n    .map_err(|e| e.add_context(\"parsing config\"))?\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "ok-or",
+            "pattern": "\\.ok_or\\(|\\.ok_or_else\\(",
+            "title": "Option to Result",
+            "rustTerm": "ok_or and ok_or_else",
+            "explanation": "Convert `Option` to `Result` by providing an error for the `None` case. Use with `?` for clean error propagation.",
+            "example": "fn get_user(id: u32) -> Result<User, Error> {\n    users.get(&id)\n        .ok_or(Error::UserNotFound(id))?\n        .clone()\n}",
+            "deepExplanation": "## Converting Option to Result\n\n### `.ok_or(err)`\nProvide a fixed error:\n```rust\nlet user = users.get(&id)\n    .ok_or(\"user not found\")?;\n```\n\n### `.ok_or_else(|| err)`\nCompute error lazily:\n```rust\nlet user = users.get(&id)\n    .ok_or_else(|| Error::NotFound {\n        resource: \"user\",\n        id: id.to_string(),\n    })?;\n```\n\n### Common Pattern\n```rust\nfn find_config_value(key: &str) -> Result<String, ConfigError> {\n    config.get(key)\n        .map(|v| v.to_string())\n        .ok_or_else(|| ConfigError::MissingKey(key.to_string()))\n}\n```\n\n### Why Use This?\n```rust\n// Without ok_or - verbose\nfn get_setting(key: &str) -> Result<String, Error> {\n    match settings.get(key) {\n        Some(v) => Ok(v.clone()),\n        None => Err(Error::Missing(key.into())),\n    }\n}\n\n// With ok_or - clean\nfn get_setting(key: &str) -> Result<String, Error> {\n    settings.get(key)\n        .cloned()\n        .ok_or_else(|| Error::Missing(key.into()))\n}\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ]
+        }
+    ]
+}

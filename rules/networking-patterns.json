@@ -1,0 +1,143 @@
+{
+    "category": "Networking & I/O Patterns",
+    "rules": [
+        {
+            "id": "byte-literal",
+            "pattern": "b'[^']+'|b\"[^\"]+\"",
+            "title": "Byte Literals",
+            "rustTerm": "byte literals",
+            "officialDoc": "https://doc.rust-lang.org/reference/tokens.html#byte-and-byte-string-literals",
+            "explanation": "b'x' is a single byte (u8), b\"...\" is a byte slice (&[u8]). Essential for binary protocols like HTTP where you work with raw bytes, not Unicode.",
+            "example": "// Single byte\nlet newline: u8 = b'\\n';\n\n// Byte string (slice of bytes)\nlet response: &[u8] = b\"HTTP/1.1 200 OK\\r\\n\\r\\n\";",
+            "deepExplanation": "## Byte Literals in Rust\n\n### Why Bytes Instead of Strings?\n\nNetwork protocols (HTTP, TCP) and file formats work with **raw bytes**, not Unicode text. Using byte literals:\n- Avoids UTF-8 encoding/decoding overhead\n- Matches the wire format exactly\n- Prevents encoding errors\n\n### Single Byte: b'x'\n```rust\nlet slash: u8 = b'/';\nlet newline: u8 = b'\\n';\nlet carriage_return: u8 = b'\\r';\n\n// Comparing bytes in a buffer\nif buffer[0] == b'G' && buffer[1] == b'E' && buffer[2] == b'T' {\n    // It's a GET request\n}\n```\n\n### Byte String: b\"...\"\n```rust\n// Type is &[u8; N] which coerces to &[u8]\nlet http_ok: &[u8] = b\"HTTP/1.1 200 OK\\r\\n\\r\\n\";\nlet headers: &[u8] = b\"Content-Type: text/plain\\r\\n\";\n\n// Writing to a TCP stream\nstream.write_all(b\"HTTP/1.1 404 Not Found\\r\\n\\r\\n\")?;\n```\n\n### Comparing Bytes to Strings\n| Syntax | Type | Use For |\n|--------|------|----------|\n| `'x'` | `char` | Unicode character (4 bytes) |\n| `b'x'` | `u8` | Single ASCII byte |\n| `\"hello\"` | `&str` | UTF-8 text |\n| `b\"hello\"` | `&[u8]` | Raw bytes / binary data |\n\n### Converting Between Bytes and Strings\n```rust\n// String to bytes\nlet s = \"hello\";\nlet bytes: &[u8] = s.as_bytes();\n\n// Bytes to string (if valid UTF-8)\nlet bytes: &[u8] = b\"hello\";\nlet s: &str = std::str::from_utf8(bytes)?;\n\n// Bytes to String (owned, if valid UTF-8)\nlet owned: String = String::from_utf8(bytes.to_vec())?;\n```\n\n### Common HTTP Patterns\n```rust\n// Checking request method\nif buffer.starts_with(b\"GET \") {\n    handle_get(&buffer);\n} else if buffer.starts_with(b\"POST \") {\n    handle_post(&buffer);\n}\n\n// Finding line endings\nlet crlf_pos = buffer.windows(2)\n    .position(|w| w == b\"\\r\\n\");\n\n// Building response\nlet response = format!(\n    \"HTTP/1.1 200 OK\\r\\nContent-Length: {}\\r\\n\\r\\n{}\",\n    body.len(),\n    body\n);\nstream.write_all(response.as_bytes())?;\n```\n\n### Key Insight\nWhen working with network protocols, think in **bytes** not **characters**. A `char` in Rust is 4 bytes (Unicode scalar value), but network protocols use single bytes. That's why `b'/'` (1 byte) is more efficient than `'/'` (4 bytes) when parsing HTTP.",
+            "confidence": 0.8,
+            "contexts": [
+                "general",
+                "web"
+            ]
+        },
+        {
+            "id": "fixed-buffer",
+            "pattern": "\\[0u8;\\s*\\d+\\]|\\[0;\\s*\\d+\\]",
+            "title": "Fixed-Size Buffer",
+            "rustTerm": "array initialization",
+            "officialDoc": "https://doc.rust-lang.org/std/primitive.array.html",
+            "explanation": "Creates a stack-allocated buffer initialized to zeros. Common for reading from sockets or files when you don't know the size ahead of time.",
+            "example": "let mut buffer = [0u8; 1024];\nlet n = stream.read(&mut buffer)?;\nlet data = &buffer[..n];  // Only the bytes we actually read",
+            "deepExplanation": "## Fixed-Size Buffers\n\n### The Pattern\n```rust\nlet mut buffer = [0u8; 1024];  // 1KB buffer of zeros\n```\n\nThis creates:\n- An array of 1024 bytes\n- All initialized to 0\n- On the stack (fast allocation)\n\n### Why This Pattern?\n\nWhen reading from a socket or file, you need a place to put the data before you know how much data there is:\n\n```rust\nlet mut buffer = [0u8; 1024];\n\n// read() fills buffer, returns how many bytes were read\nlet bytes_read = stream.read(&mut buffer)?;\n\n// Only use the portion that was filled\nlet actual_data = &buffer[..bytes_read];\n```\n\n### Common Buffer Sizes\n```rust\n[0u8; 512]    // Small requests\n[0u8; 1024]   // 1KB - common default\n[0u8; 4096]   // 4KB - page size, efficient\n[0u8; 8192]   // 8KB - larger transfers\n[0u8; 65536]  // 64KB - maximum for some protocols\n```\n\n### Stack vs Heap\n```rust\n// Stack - fast, limited size (~1-8MB typically)\nlet buffer = [0u8; 4096];\n\n// Heap - slower, larger sizes ok\nlet buffer = vec![0u8; 1_000_000];  // 1MB\n```\n\n### Reading in a Loop\n```rust\nlet mut buffer = [0u8; 4096];\nlet mut all_data = Vec::new();\n\nloop {\n    let n = stream.read(&mut buffer)?;\n    if n == 0 {\n        break;  // EOF\n    }\n    all_data.extend_from_slice(&buffer[..n]);\n}\n```\n\n### The Slice: &buffer[..n]\n```rust\nlet mut buffer = [0u8; 1024];\nlet n = stream.read(&mut buffer)?;  // Say we read 100 bytes\n\n// buffer is still 1024 bytes, but only 100 are valid\nlet valid_data: &[u8] = &buffer[..n];  // First 100 bytes only\n```\n\n### Alternative: Vec for Dynamic Size\n```rust\n// When you need to grow the buffer\nlet mut buffer = Vec::with_capacity(1024);\nbuffer.resize(1024, 0);  // Fill with zeros\n\n// Or use read_to_end for unknown size\nlet mut buffer = Vec::new();\nstream.read_to_end(&mut buffer)?;\n```",
+            "confidence": 0.7,
+            "contexts": [
+                "general",
+                "web"
+            ]
+        },
+        {
+            "id": "read-write-traits",
+            "pattern": "\\.read\\(|\\.write\\(|\\.read_exact\\(|\\.write_all\\(",
+            "title": "Read/Write I/O Traits",
+            "rustTerm": "std::io::Read and Write",
+            "officialDoc": "https://doc.rust-lang.org/std/io/trait.Read.html",
+            "explanation": "Read and Write are traits for I/O operations. Use read_exact() when you need exactly N bytes, write_all() to ensure everything is written.",
+            "example": "// read() may return fewer bytes than buffer size\nlet n = stream.read(&mut buffer)?;\n\n// write_all() ensures everything is written\nstream.write_all(b\"HTTP/1.1 200 OK\\r\\n\")?;",
+            "deepExplanation": "## Read and Write Traits\n\nThese are the core I/O traits in Rust - implemented by files, sockets, and many other types.\n\n### Read Trait Methods\n\n**read() - May read less than requested**\n```rust\nlet mut buf = [0u8; 1024];\nlet n = stream.read(&mut buf)?;  // Returns 0..=1024\n// IMPORTANT: n might be less than 1024!\nlet data = &buf[..n];\n```\n\n**read_exact() - Read exactly N bytes or fail**\n```rust\nlet mut header = [0u8; 4];\nstream.read_exact(&mut header)?;  // Reads exactly 4 bytes\n// If fewer available, returns Err(UnexpectedEof)\n```\n\n**read_to_end() - Read everything**\n```rust\nlet mut data = Vec::new();\nstream.read_to_end(&mut data)?;  // Reads until EOF\n```\n\n**read_to_string() - Read as UTF-8**\n```rust\nlet mut content = String::new();\nfile.read_to_string(&mut content)?;\n```\n\n### Write Trait Methods\n\n**write() - May write less than requested**\n```rust\nlet data = b\"Hello, World!\";\nlet n = stream.write(data)?;  // Returns 0..=13\n// IMPORTANT: n might be less than data.len()!\n```\n\n**write_all() - Write everything or fail**\n```rust\nstream.write_all(b\"HTTP/1.1 200 OK\\r\\n\\r\\n\")?;\n// Guarantees all bytes written, or returns error\n```\n\n**flush() - Ensure data is sent**\n```rust\nstream.write_all(data)?;\nstream.flush()?;  // Force buffered data to be sent\n```\n\n### Common Mistakes\n\n❌ **Ignoring partial reads**\n```rust\nlet mut buf = [0u8; 100];\nstream.read(&mut buf)?;\n// Bug: assuming buf is fully filled!\nprocess(&buf);  // May contain zeros/garbage\n```\n\n✅ **Handle partial reads**\n```rust\nlet mut buf = [0u8; 100];\nlet n = stream.read(&mut buf)?;\nprocess(&buf[..n]);  // Only process what we read\n```\n\n❌ **Ignoring partial writes**\n```rust\nstream.write(large_data)?;\n// Bug: might not write everything!\n```\n\n✅ **Use write_all()**\n```rust\nstream.write_all(large_data)?;  // Guaranteed complete\n```\n\n### BufReader/BufWriter for Efficiency\n```rust\nuse std::io::{BufReader, BufWriter, BufRead};\n\nlet reader = BufReader::new(stream);\nfor line in reader.lines() {\n    println!(\"{}\", line?);\n}\n\nlet mut writer = BufWriter::new(stream);\nwriter.write_all(data)?;\nwriter.flush()?;\n```",
+            "confidence": 0.7,
+            "contexts": [
+                "general",
+                "web"
+            ]
+        },
+        {
+            "id": "unwrap-or-default",
+            "pattern": "\\.unwrap_or\\(|\\.unwrap_or_else\\(|\\.unwrap_or_default\\(",
+            "title": "Unwrap with Default",
+            "rustTerm": "unwrap_or",
+            "officialDoc": "https://doc.rust-lang.org/std/option/enum.Option.html#method.unwrap_or",
+            "explanation": "Provides a fallback value instead of panicking. Use unwrap_or() for simple values, unwrap_or_else() for expensive computations, unwrap_or_default() for Default types.",
+            "example": "let count = input.parse::<i32>().unwrap_or(0);\nlet name = user.name.unwrap_or_else(|| \"Anonymous\".to_string());\nlet items: Vec<_> = maybe_vec.unwrap_or_default();",
+            "suggestedFix": {
+                "description": "Use Default trait instead",
+                "before": ".unwrap_or(",
+                "after": ".unwrap_or_default( // TODO: remove arg"
+            },
+            "deepExplanation": "## Unwrap with Fallback Values\n\n### The Problem with unwrap()\n```rust\nlet n = stream.read(&mut buf).unwrap();  // Panics on error!\n```\n\n### unwrap_or() - Simple Fallback\n```rust\n// If read fails, use 0\nlet n = stream.read(&mut buf).unwrap_or(0);\n\n// If parse fails, use default\nlet port: u16 = env::var(\"PORT\")\n    .unwrap_or(\"8080\".to_string())\n    .parse()\n    .unwrap_or(8080);\n```\n\n### unwrap_or_else() - Lazy/Expensive Fallback\n```rust\n// The closure only runs if needed\nlet config = load_config().unwrap_or_else(|_| {\n    eprintln!(\"Using default config\");\n    Config::default()  // Only computed on error\n});\n\n// Good for allocations\nlet name = cached_name.unwrap_or_else(|| {\n    expensive_lookup()  // Only called if None\n});\n```\n\n### unwrap_or_default() - Use Default Trait\n```rust\n// Works for types implementing Default\nlet items: Vec<String> = maybe_items.unwrap_or_default();  // Empty vec\nlet count: i32 = maybe_count.unwrap_or_default();          // 0\nlet text: String = maybe_text.unwrap_or_default();          // \"\"\n```\n\n### Comparison\n| Method | When to Use | Fallback Evaluated |\n|--------|-------------|--------------------|\n| `unwrap_or(val)` | Simple, cheap value | Always |\n| `unwrap_or_else(\\|\\| ...)` | Expensive computation | Only on None/Err |\n| `unwrap_or_default()` | Type has Default | Only on None/Err |\n\n### With Result<T, E>\n```rust\n// All three work with Result too\nlet bytes = file.read(&mut buf)\n    .unwrap_or(0);  // On any error, return 0\n\nlet content = fs::read_to_string(path)\n    .unwrap_or_else(|e| {\n        eprintln!(\"Warning: {}\", e);\n        String::new()\n    });\n```\n\n### Better Alternative: Match or if-let\n```rust\n// When you need different behavior for error cases\nmatch stream.read(&mut buffer) {\n    Ok(0) => break,  // EOF\n    Ok(n) => process(&buffer[..n]),\n    Err(e) if e.kind() == ErrorKind::WouldBlock => continue,\n    Err(e) => return Err(e.into()),\n}\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general",
+                "web"
+            ]
+        },
+        {
+            "id": "thread-spawn-move",
+            "pattern": "thread::spawn|std::thread::spawn",
+            "title": "Spawning Threads",
+            "rustTerm": "std::thread::spawn",
+            "officialDoc": "https://doc.rust-lang.org/std/thread/fn.spawn.html",
+            "explanation": "Creates a new OS thread. Use `move` to transfer ownership of captured variables to the thread. The thread outlives the scope where it was created.",
+            "example": "let handle = std::thread::spawn(move || {\n    // This closure owns `data`\n    process(data);\n});\nhandle.join().unwrap();  // Wait for thread to finish",
+            "deepExplanation": "## Spawning Threads in Rust\n\n### Basic Pattern\n```rust\nuse std::thread;\n\nlet handle = thread::spawn(|| {\n    println!(\"Hello from thread!\");\n});\n\nhandle.join().unwrap();  // Wait for completion\n```\n\n### Why `move` is Usually Required\n```rust\nlet data = vec![1, 2, 3];\n\n// ❌ Won't compile - thread might outlive `data`\nthread::spawn(|| {\n    println!(\"{:?}\", data);\n});\n\n// ✅ Move ownership into the thread\nthread::spawn(move || {\n    println!(\"{:?}\", data);  // Thread owns data now\n});\n// data is no longer accessible here\n```\n\n### Common Pattern: Handle Connections\n```rust\nfor stream in listener.incoming() {\n    match stream {\n        Ok(stream) => {\n            // Each connection gets its own thread\n            thread::spawn(move || {\n                handle_connection(stream);\n            });\n        }\n        Err(e) => eprintln!(\"Connection failed: {}\", e),\n    }\n}\n```\n\n### Returning Values from Threads\n```rust\nlet handle = thread::spawn(move || {\n    expensive_computation()\n});\n\nlet result = handle.join().unwrap();  // Get the return value\n```\n\n### Thread Panics\n```rust\nlet handle = thread::spawn(|| {\n    panic!(\"Oops!\");\n});\n\nmatch handle.join() {\n    Ok(result) => println!(\"Success: {:?}\", result),\n    Err(_) => eprintln!(\"Thread panicked!\"),\n}\n```\n\n### Better Alternative: Thread Pools\n```rust\n// For many short-lived tasks, use a thread pool\nuse rayon::prelude::*;\n\nitems.par_iter()  // Parallel iterator\n    .for_each(|item| process(item));\n\n// Or for servers, use async/tokio instead of threads\n```\n\n### Sharing Data Between Threads\n```rust\nuse std::sync::{Arc, Mutex};\n\nlet counter = Arc::new(Mutex::new(0));\nlet mut handles = vec![];\n\nfor _ in 0..10 {\n    let counter = Arc::clone(&counter);\n    handles.push(thread::spawn(move || {\n        let mut num = counter.lock().unwrap();\n        *num += 1;\n    }));\n}\n\nfor handle in handles {\n    handle.join().unwrap();\n}\n```\n\n### Thread Count Considerations\n- One thread per connection = simple but doesn't scale\n- Threads have ~1MB stack overhead each\n- For high concurrency, consider async (tokio) instead",
+            "confidence": 0.7,
+            "contexts": [
+                "general",
+                "web"
+            ]
+        },
+        {
+            "id": "slice-syntax",
+            "pattern": "&\\w+\\[\\.\\.|&\\w+\\[\\d*\\.\\.",
+            "title": "Slice Syntax",
+            "rustTerm": "slicing",
+            "officialDoc": "https://doc.rust-lang.org/std/primitive.slice.html",
+            "explanation": "&array[start..end] creates a slice (view) of part of an array or Vec without copying. The range is half-open: includes start, excludes end.",
+            "example": "let bytes = &buffer[..n];      // First n bytes\nlet rest = &buffer[1..];       // Skip first byte\nlet middle = &buffer[1..5];    // Bytes 1,2,3,4",
+            "deepExplanation": "## Slice Syntax in Rust\n\n### What is a Slice?\nA slice is a **view** into a contiguous sequence - no copying, just a pointer and length.\n\n```rust\nlet arr = [1, 2, 3, 4, 5];\nlet slice: &[i32] = &arr[1..4];  // [2, 3, 4]\n```\n\n### Slice Range Syntax\n```rust\nlet data = [0, 1, 2, 3, 4, 5];\n\n&data[2..5]   // [2, 3, 4]     - from index 2 to 4\n&data[2..]    // [2, 3, 4, 5]  - from index 2 to end\n&data[..3]    // [0, 1, 2]     - from start to index 2\n&data[..]     // [0, 1, 2, 3, 4, 5] - entire slice\n&data[2..=4]  // [2, 3, 4]     - inclusive end\n```\n\n### Common Use: Reading from Buffers\n```rust\nlet mut buffer = [0u8; 1024];\nlet n = stream.read(&mut buffer)?;\n\n// Only use the bytes we actually read\nlet valid_data = &buffer[..n];\n```\n\n### Parsing with Slices\n```rust\nlet request = b\"GET /path HTTP/1.1\\r\\n\";\n\n// Skip \"GET \"\nlet after_method = &request[4..];\n\n// Find the path\nif let Some(space_pos) = after_method.iter().position(|&b| b == b' ') {\n    let path = &after_method[..space_pos];\n    // path is b\"/path\"\n}\n```\n\n### Mutable Slices\n```rust\nlet mut data = [1, 2, 3, 4, 5];\n\n// Modify part of the array\nlet slice = &mut data[1..4];\nslice[0] = 10;  // data is now [1, 10, 3, 4, 5]\n```\n\n### Split Slices\n```rust\nlet data = [1, 2, 3, 4, 5, 6];\nlet (left, right) = data.split_at(3);\n// left: [1, 2, 3], right: [4, 5, 6]\n```\n\n### Chaining with Split\n```rust\nlet line = b\"Content-Type: text/html\";\n\nif let Some(colon_pos) = line.iter().position(|&b| b == b':') {\n    let key = &line[..colon_pos];           // b\"Content-Type\"\n    let value = &line[colon_pos + 1..];     // b\" text/html\"\n    let value = value.trim_ascii_start();   // b\"text/html\"\n}\n```\n\n### Key Points\n- Slices don't own data, they borrow it\n- Creating a slice is O(1) - no copying\n- Range is half-open: `[start..end)` includes start, excludes end\n- Use `..=` for inclusive end: `[start..=end]`\n- Out-of-bounds panics at runtime",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "tcp-listener",
+            "pattern": "TcpListener::|TcpStream::",
+            "title": "TCP Networking",
+            "rustTerm": "std::net::TcpListener",
+            "officialDoc": "https://doc.rust-lang.org/std/net/struct.TcpListener.html",
+            "explanation": "TcpListener binds to an address and accepts connections. Each connection gives you a TcpStream for reading and writing data.",
+            "example": "let listener = TcpListener::bind(\"127.0.0.1:8080\")?;\n\nfor stream in listener.incoming() {\n    let stream = stream?;\n    handle_connection(stream);\n}",
+            "deepExplanation": "## TCP Networking in Rust\n\n### Server: TcpListener\n```rust\nuse std::net::TcpListener;\n\nlet listener = TcpListener::bind(\"127.0.0.1:8080\")?;\nprintln!(\"Listening on port 8080\");\n\nfor stream in listener.incoming() {\n    match stream {\n        Ok(stream) => handle_client(stream),\n        Err(e) => eprintln!(\"Accept failed: {}\", e),\n    }\n}\n```\n\n### Client: TcpStream\n```rust\nuse std::net::TcpStream;\n\nlet mut stream = TcpStream::connect(\"127.0.0.1:8080\")?;\nstream.write_all(b\"Hello, server!\")?;\n\nlet mut response = Vec::new();\nstream.read_to_end(&mut response)?;\n```\n\n### Reading and Writing\n```rust\nfn handle_client(mut stream: TcpStream) -> io::Result<()> {\n    let mut buffer = [0u8; 1024];\n    \n    // Read request\n    let n = stream.read(&mut buffer)?;\n    let request = &buffer[..n];\n    \n    // Send response\n    stream.write_all(b\"HTTP/1.1 200 OK\\r\\n\\r\\nHello!\")?;\n    \n    Ok(())\n}\n```\n\n### Concurrent Connections\n```rust\n// Simple: one thread per connection\nfor stream in listener.incoming() {\n    let stream = stream?;\n    std::thread::spawn(move || {\n        if let Err(e) = handle_client(stream) {\n            eprintln!(\"Error: {}\", e);\n        }\n    });\n}\n\n// Better: use async runtime (tokio)\n```\n\n### Setting Options\n```rust\nuse std::time::Duration;\n\n// Timeouts\nstream.set_read_timeout(Some(Duration::from_secs(30)))?;\nstream.set_write_timeout(Some(Duration::from_secs(30)))?;\n\n// Non-blocking mode\nstream.set_nonblocking(true)?;\n\n// TCP options\nstream.set_nodelay(true)?;  // Disable Nagle's algorithm\n```\n\n### Address Binding\n```rust\n// Localhost only\nTcpListener::bind(\"127.0.0.1:8080\")?;\n\n// All interfaces\nTcpListener::bind(\"0.0.0.0:8080\")?;\n\n// IPv6\nTcpListener::bind(\"[::1]:8080\")?;\n\n// Let OS choose port\nlet listener = TcpListener::bind(\"127.0.0.1:0\")?;\nlet port = listener.local_addr()?.port();\n```\n\n### Common Pitfalls\n\n❌ **Not handling partial reads/writes**\n```rust\nstream.read(&mut buf)?;  // Might not fill buffer!\n```\n\n✅ **Use read_exact or loop**\n```rust\nstream.read_exact(&mut buf)?;  // Reads exactly buf.len()\n```\n\n❌ **Blocking the accept loop**\n```rust\nfor stream in listener.incoming() {\n    handle_client(stream?);  // Blocks other clients!\n}\n```\n\n✅ **Spawn threads or use async**\n```rust\nfor stream in listener.incoming() {\n    let stream = stream?;\n    thread::spawn(move || handle_client(stream));\n}\n```",
+            "confidence": 0.7,
+            "contexts": [
+                "web",
+                "general"
+            ]
+        },
+        {
+            "id": "string-find-contains",
+            "pattern": "\\.find\\(|\\.contains\\(|\\.starts_with\\(|\\.ends_with\\(",
+            "title": "String Searching",
+            "rustTerm": "String pattern matching",
+            "officialDoc": "https://doc.rust-lang.org/std/primitive.str.html#method.find",
+            "explanation": "find() returns the byte index of a match. contains() checks if a pattern exists. starts_with/ends_with check boundaries. All work with &str, char, or predicates.",
+            "example": "if request.contains(\"/echo\") {\n    // Handle echo endpoint\n}\n\nif let Some(pos) = line.find(':') {\n    let key = &line[..pos];\n    let value = &line[pos + 1..];\n}",
+            "deepExplanation": "## String Searching in Rust\n\n### contains() - Check if Pattern Exists\n```rust\nlet request = \"GET /api/users HTTP/1.1\";\n\nif request.contains(\"/api/\") {\n    println!(\"API request\");\n}\n\nif request.contains('?') {\n    println!(\"Has query string\");\n}\n```\n\n### find() - Get Position of Match\n```rust\nlet header = \"Content-Type: application/json\";\n\nif let Some(colon_pos) = header.find(':') {\n    let key = &header[..colon_pos];        // \"Content-Type\"\n    let value = &header[colon_pos + 1..];  // \" application/json\"\n    let value = value.trim();               // \"application/json\"\n}\n```\n\n### starts_with / ends_with\n```rust\nlet path = \"/api/users/123\";\n\nif path.starts_with(\"/api/\") {\n    // Route to API handler\n}\n\nif path.ends_with(\".json\") {\n    // Return JSON response\n}\n```\n\n### rfind() - Search from End\n```rust\nlet path = \"/path/to/file.tar.gz\";\n\nif let Some(dot_pos) = path.rfind('.') {\n    let extension = &path[dot_pos + 1..];  // \"gz\"\n}\n```\n\n### Pattern Types\n```rust\nlet text = \"Hello, World!\";\n\n// &str pattern\ntext.find(\"World\");           // Some(7)\n\n// char pattern\ntext.find(',');               // Some(5)\n\n// Predicate (closure)\ntext.find(|c: char| c.is_uppercase());  // Some(0) - 'H'\ntext.find(char::is_numeric);   // None\n```\n\n### Splitting at Match\n```rust\nlet line = \"key=value\";\n\nif let Some((key, value)) = line.split_once('=') {\n    println!(\"{} -> {}\", key, value);\n}\n\n// Or manually:\nif let Some(pos) = line.find('=') {\n    let key = &line[..pos];\n    let value = &line[pos + 1..];\n}\n```\n\n### Bytes vs Strings\n```rust\n// For &str (UTF-8)\nlet text = \"Hello\";\ntext.find('e');  // Returns byte index: Some(1)\n\n// For &[u8] (bytes)\nlet bytes = b\"Hello\";\nbytes.iter().position(|&b| b == b'e');  // Some(1)\n```\n\n### Multiple Matches\n```rust\nlet text = \"a,b,c,d\";\n\n// Find all positions\nfor (i, _) in text.match_indices(',') {\n    println!(\"Comma at index {}\", i);\n}\n\n// Split on pattern\nfor part in text.split(',') {\n    println!(\"Part: {}\", part);\n}\n```\n\n### Important: Byte Index vs Char Index\n```rust\nlet text = \"Héllo\";\nlet pos = text.find('l');  // Some(3) - byte index!\n// 'é' is 2 bytes in UTF-8, so 'l' is at byte 3, not char 2\n\n// Safe slicing\nif let Some(pos) = text.find('l') {\n    let after = &text[pos..];  // Safe\n}\n```",
+            "confidence": 0.5,
+            "contexts": [
+                "general",
+                "parser"
+            ]
+        },
+        {
+            "id": "format-macro",
+            "pattern": "format!\\(",
+            "title": "String Formatting",
+            "rustTerm": "format! macro",
+            "officialDoc": "https://doc.rust-lang.org/std/macro.format.html",
+            "explanation": "format!() creates a String by interpolating values into a template. Similar to println! but returns the string instead of printing it.",
+            "example": "let response = format!(\n    \"HTTP/1.1 200 OK\\r\\nContent-Length: {}\\r\\n\\r\\n{}\",\n    body.len(),\n    body\n);",
+            "deepExplanation": "## The format! Macro\n\n### Basic Usage\n```rust\nlet name = \"Alice\";\nlet age = 30;\n\nlet msg = format!(\"Hello, {}! You are {} years old.\", name, age);\n// \"Hello, Alice! You are 30 years old.\"\n```\n\n### Named Arguments\n```rust\nlet response = format!(\n    \"HTTP/1.1 {status}\\r\\nContent-Length: {len}\\r\\n\\r\\n{body}\",\n    status = \"200 OK\",\n    len = body.len(),\n    body = body\n);\n```\n\n### Formatting Options\n```rust\n// Width and alignment\nformat!(\"{:>10}\", \"hi\");      // \"        hi\" (right align)\nformat!(\"{:<10}\", \"hi\");      // \"hi        \" (left align)\nformat!(\"{:^10}\", \"hi\");      // \"    hi    \" (center)\n\n// Padding with zeros\nformat!(\"{:05}\", 42);         // \"00042\"\n\n// Precision for floats\nformat!(\"{:.2}\", 3.14159);    // \"3.14\"\n\n// Hex, binary, octal\nformat!(\"{:x}\", 255);         // \"ff\"\nformat!(\"{:X}\", 255);         // \"FF\"\nformat!(\"{:b}\", 255);         // \"11111111\"\nformat!(\"{:o}\", 255);         // \"377\"\n```\n\n### Debug Formatting\n```rust\nlet vec = vec![1, 2, 3];\n\nformat!(\"{:?}\", vec);         // \"[1, 2, 3]\"\nformat!(\"{:#?}\", vec);        // Pretty-printed with newlines\n```\n\n### Building HTTP Responses\n```rust\nfn ok_response(body: &str) -> String {\n    format!(\n        \"HTTP/1.1 200 OK\\r\\n\\\n         Content-Type: text/plain\\r\\n\\\n         Content-Length: {}\\r\\n\\\n         \\r\\n\\\n         {}\",\n        body.len(),\n        body\n    )\n}\n```\n\n### Alternatives\n\n**println!** - format and print to stdout\n```rust\nprintln!(\"Value: {}\", x);  // Prints, returns ()\n```\n\n**write!** - format into a buffer\n```rust\nuse std::fmt::Write;\nlet mut buf = String::new();\nwrite!(buf, \"Value: {}\", x)?;\n```\n\n**concat!** - compile-time string concatenation (no interpolation)\n```rust\nconst GREETING: &str = concat!(\"Hello, \", \"World!\");\n```\n\n### Performance Note\n`format!` allocates a new String each time. For repeated formatting in hot paths, consider:\n```rust\n// Reuse buffer\nlet mut buffer = String::with_capacity(256);\nbuffer.clear();\nwrite!(&mut buffer, \"...\", args)?;\n```",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        }
+    ]
+}

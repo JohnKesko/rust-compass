@@ -1,0 +1,105 @@
+{
+  "name": "rust-compass",
+  "displayName": "Rust Compass",
+  "description": "A contextual Rust learning companion that provides hints, explanations, and guidance while coding",
+  "version": "0.0.1",
+  "publisher": "JohnK",
+  "preview": true,
+  "icon": "img/icon-experimental.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JohnKesko/rust-compass.git"
+  },
+  "engines": {
+    "vscode": "^1.106.1"
+  },
+  "categories": [
+    "Programming Languages",
+    "Education",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:rust"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "rust-compass.toggleHints",
+        "title": "Rust Compass: Toggle Hints"
+      },
+      {
+        "command": "rust-compass.setProjectContext",
+        "title": "Rust Compass: Set Project Context"
+      },
+      {
+        "command": "rust-compass.dismissRule",
+        "title": "Rust Compass: Hide This Hint"
+      },
+      {
+        "command": "rust-compass.restoreAllHints",
+        "title": "Rust Compass: Restore Hidden Hints"
+      },
+      {
+        "command": "rust-compass.learnMore",
+        "title": "Rust Compass: Learn More About Pattern"
+      },
+      {
+        "command": "rust-compass.askAI",
+        "title": "Rust Compass: Ask AI About This Pattern"
+      },
+      {
+        "command": "rust-compass.showDependencies",
+        "title": "Rust Compass: Show Detected Dependencies"
+      },
+      {
+        "command": "rust-compass.showProgress",
+        "title": "Rust Compass: Show Learning Progress"
+      }
+    ],
+    "configuration": {
+      "title": "Rust Compass",
+      "properties": {
+        "rustCompass.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable Rust Compass hints"
+        },
+        "rustCompass.projectContext": {
+          "type": "string",
+          "enum": [
+            "general",
+            "parser",
+            "web",
+            "cli",
+            "systems"
+          ],
+          "default": "general",
+          "description": "Project context for more relevant hints"
+        },
+        "rustCompass.showDecorations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline decorations for detected patterns"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.106.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.48.1",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}

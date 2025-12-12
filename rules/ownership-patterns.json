@@ -1,0 +1,140 @@
+{
+    "category": "Ownership Patterns",
+    "rules": [
+        {
+            "id": "excessive-clone",
+            "pattern": "\\.clone\\(\\)",
+            "title": "Cloning Data",
+            "rustTerm": "Clone trait",
+            "explanation": "`.clone()` creates a deep copy. Consider borrowing (`&T`) or using `Cow<T>` if you only sometimes need ownership.",
+            "example": "// Instead of cloning:\nfn process(s: String) { ... }\nprocess(my_string.clone());\n\n// Consider borrowing:\nfn process(s: &str) { ... }\nprocess(&my_string);",
+            "suggestedFix": {
+                "description": "Consider borrowing instead",
+                "before": ".clone()",
+                "after": " /* TODO: borrow with & instead? */"
+            },
+            "deepExplanation": "## When is `.clone()` okay?\n\n✅ **Good uses:**\n- `Rc<T>` / `Arc<T>` cloning (cheap reference count)\n- Small `Copy` types\n- When you genuinely need independent ownership\n- Prototyping (fix perf later)\n\n❌ **Code smells:**\n- Cloning to satisfy the borrow checker\n- Cloning in hot loops\n- Cloning large data structures\n\n### Alternatives\n```rust\n// Borrow instead\nfn greet(name: &str) { ... }\n\n// Use Cow for sometimes-owned\nuse std::borrow::Cow;\nfn process(s: Cow<str>) { ... }\n\n// Use references in structs\nstruct Parser<'a> {\n    input: &'a str,\n}\n```\n\n### Rule of Thumb\nIf you're cloning just to make the compiler happy, there's usually a better design.",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "string-vs-str",
+            "pattern": "String::from|String::new|\\.to_string\\(\\)",
+            "title": "String Allocation",
+            "rustTerm": "String vs &str",
+            "explanation": "`String` is heap-allocated and owned. `&str` is a borrowed slice. Prefer `&str` for function parameters when you don't need ownership.",
+            "example": "// Prefer &str for input parameters:\nfn greet(name: &str) { ... }\n\n// Use String when you need ownership:\nstruct Person {\n    name: String, // Owns the data\n}",
+            "deepExplanation": "## String vs &str\n\n| Type | Ownership | Allocation | Mutable |\n|------|-----------|------------|----------|\n| `String` | Owned | Heap | Yes |\n| `&str` | Borrowed | None | No |\n| `&mut str` | Borrowed | None | Limited |\n\n### Guidelines\n\n**Function parameters:**\n```rust\n// ✅ Accept &str - works with String and &str\nfn process(s: &str) { ... }\nprocess(\"literal\");       // &str\nprocess(&my_string);      // &String -> &str\n\n// ❌ Requiring String forces allocation\nfn process(s: String) { ... }\nprocess(\"literal\".to_string()); // Unnecessary alloc\n```\n\n**Struct fields:**\n```rust\n// Owned - struct manages lifetime\nstruct Config {\n    path: String,\n}\n\n// Borrowed - needs lifetime parameter\nstruct Parser<'a> {\n    input: &'a str,\n}\n```\n\n### Rule of Thumb\n- Parameters: `&str` (flexible)\n- Return values: `String` (safe) or `&str` (if borrowing from input)\n- Struct fields: `String` (unless you need references)",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ],
+            "suggestedFix": {
+                "description": "Use .into() for flexible conversion",
+                "before": ".to_string()",
+                "after": ".into()"
+            }
+        },
+        {
+            "id": "rc-arc-usage",
+            "pattern": "Rc::|Arc::",
+            "title": "Reference Counting",
+            "rustTerm": "Rc<T> and Arc<T>",
+            "explanation": "`Rc` is for single-threaded shared ownership. `Arc` is for multi-threaded (atomic). Both are cheap to clone.",
+            "example": "// Single-threaded:\nuse std::rc::Rc;\nlet shared = Rc::new(data);\nlet clone = Rc::clone(&shared); // Cheap!\n\n// Multi-threaded:\nuse std::sync::Arc;\nlet shared = Arc::new(data);",
+            "suggestedFix": {
+                "description": "Use Arc for thread-safe sharing",
+                "before": "Rc::",
+                "after": "Arc::"
+            },
+            "deepExplanation": "## Shared Ownership in Rust\n\nRust's ownership model usually means one owner. `Rc` and `Arc` allow multiple owners.\n\n### Rc (Reference Counted)\n```rust\nuse std::rc::Rc;\n\nlet data = Rc::new(vec![1, 2, 3]);\nlet a = Rc::clone(&data); // +1 ref count\nlet b = Rc::clone(&data); // +1 ref count\n// data dropped when all refs gone\n```\n\n### Arc (Atomic Reference Counted)\n```rust\nuse std::sync::Arc;\nuse std::thread;\n\nlet data = Arc::new(vec![1, 2, 3]);\nlet data_clone = Arc::clone(&data);\n\nthread::spawn(move || {\n    println!(\"{:?}\", data_clone);\n});\n```\n\n### When to use\n| Situation | Use |\n|-----------|-----|\n| Single thread, shared read | `Rc<T>` |\n| Multi-thread, shared read | `Arc<T>` |\n| Shared + mutable | `Rc<RefCell<T>>` or `Arc<Mutex<T>>` |\n\n### ⚠️ Watch out for cycles!\n`Rc` can leak memory with cycles. Use `Weak` for back-references.",
+            "confidence": 0.8,
+            "contexts": [
+                "general",
+                "systems"
+            ]
+        },
+        {
+            "id": "mutable-reference",
+            "pattern": "&mut\\s+\\w",
+            "title": "Mutable Reference",
+            "rustTerm": "&mut T",
+            "explanation": "A mutable reference lets you modify borrowed data. Only ONE mutable reference allowed at a time - this prevents data races.",
+            "example": "fn add_one(num: &mut i32) {\n    *num += 1;\n}\n\nlet mut x = 5;\nadd_one(&mut x);\n// x is now 6",
+            "deepExplanation": "## Mutable References\n\nRust's borrowing rules:\n1. You can have ONE mutable reference OR many immutable references\n2. Never both at the same time\n\n### Why?\n```rust\n// This would be bad if allowed:\nlet mut data = vec![1, 2, 3];\nlet r1 = &data[0];      // Immutable borrow\ndata.push(4);           // Mutable borrow - might reallocate!\nprintln!(\"{}\", r1);     // r1 might point to freed memory!\n```\n\n### Mutable Reference Rules\n```rust\nlet mut x = 5;\n\n// ✅ One mutable reference\nlet r = &mut x;\n*r += 1;\n\n// ❌ Two mutable references\nlet r1 = &mut x;\nlet r2 = &mut x; // Error!\n\n// ❌ Mutable + immutable\nlet r1 = &x;\nlet r2 = &mut x; // Error!\n```\n\n### The `*` Dereference\n```rust\nfn increment(n: &mut i32) {\n    *n += 1;  // Dereference to modify\n}\n```",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "move-closure",
+            "pattern": "move\\s*\\|",
+            "title": "Move Closure",
+            "rustTerm": "move keyword",
+            "explanation": "The `move` keyword forces a closure to take ownership of captured variables. Essential for threads and returning closures.",
+            "example": "let name = String::from(\"Alice\");\n\n// Without move: borrows name\nlet greet = || println!(\"Hi {}\", name);\n\n// With move: takes ownership\nlet greet = move || println!(\"Hi {}\", name);\n// name is no longer valid here",
+            "deepExplanation": "## Move Closures\n\nBy default, closures borrow variables. `move` forces them to take ownership.\n\n### When you need `move`\n\n**1. Spawning threads**\n```rust\nlet data = vec![1, 2, 3];\n\nthread::spawn(move || {\n    // Thread might outlive current scope\n    // so it must OWN the data\n    println!(\"{:?}\", data);\n});\n```\n\n**2. Returning closures**\n```rust\nfn make_adder(n: i32) -> impl Fn(i32) -> i32 {\n    move |x| x + n  // n must be moved in\n}\n```\n\n**3. Async blocks**\n```rust\nlet url = String::from(\"https://...\");\nlet fut = async move {\n    fetch(&url).await\n};\n```\n\n### What gets moved?\n```rust\nlet a = 1;           // Copy type - copied, not moved\nlet b = String::new(); // Move type - moved\n\nlet f = move || {\n    println!(\"{} {}\", a, b);\n};\n\nprintln!(\"{}\", a);  // ✅ a was copied\nprintln!(\"{}\", b);  // ❌ b was moved\n```",
+            "confidence": 0.8,
+            "contexts": [
+                "general",
+                "async"
+            ]
+        },
+        {
+            "id": "refcell-usage",
+            "pattern": "RefCell::|RefCell<",
+            "title": "Interior Mutability",
+            "rustTerm": "RefCell<T>",
+            "explanation": "`RefCell` allows mutable borrows checked at runtime instead of compile time. Panics if you violate borrowing rules.",
+            "example": "use std::cell::RefCell;\n\nlet data = RefCell::new(5);\n*data.borrow_mut() += 1;  // Runtime borrow check\nprintln!(\"{}\", data.borrow());",
+            "deepExplanation": "## Interior Mutability with RefCell\n\nSometimes you need to mutate data behind a shared reference. `RefCell` moves borrow checking to runtime.\n\n### Basic Usage\n```rust\nuse std::cell::RefCell;\n\nlet cell = RefCell::new(vec![1, 2, 3]);\n\n// Immutable borrow\nlet borrowed = cell.borrow();\nprintln!(\"{:?}\", *borrowed);\ndrop(borrowed);  // Must drop before mutable borrow\n\n// Mutable borrow\ncell.borrow_mut().push(4);\n```\n\n### Common Pattern: Rc<RefCell<T>>\n```rust\nuse std::rc::Rc;\nuse std::cell::RefCell;\n\nlet shared = Rc::new(RefCell::new(0));\nlet clone = Rc::clone(&shared);\n\n*shared.borrow_mut() += 1;\n*clone.borrow_mut() += 1;\n\nassert_eq!(*shared.borrow(), 2);\n```\n\n### ⚠️ Panics at Runtime!\n```rust\nlet cell = RefCell::new(1);\nlet r1 = cell.borrow();\nlet r2 = cell.borrow_mut(); // PANIC! Already borrowed\n```\n\nUse `try_borrow()` / `try_borrow_mut()` to avoid panics.",
+            "confidence": 0.8,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "cow-usage",
+            "pattern": "Cow::|Cow<",
+            "title": "Clone on Write",
+            "rustTerm": "Cow<T>",
+            "explanation": "`Cow` (Clone on Write) avoids cloning when you might not need to modify data. Borrows when possible, clones only if mutation is needed.",
+            "example": "use std::borrow::Cow;\n\nfn process(s: Cow<str>) -> Cow<str> {\n    if s.contains(\"bad\") {\n        // Only clones if we need to modify\n        Cow::Owned(s.replace(\"bad\", \"good\"))\n    } else {\n        s  // No clone needed\n    }\n}",
+            "deepExplanation": "## Clone on Write (Cow)\n\n`Cow` delays cloning until you actually need to modify data.\n\n### Why Cow?\n```rust\nuse std::borrow::Cow;\n\n// Without Cow - always clones\nfn process(s: &str) -> String {\n    if needs_change(s) {\n        s.replace(\"x\", \"y\")\n    } else {\n        s.to_string()  // Unnecessary clone!\n    }\n}\n\n// With Cow - clones only when needed\nfn process(s: &str) -> Cow<str> {\n    if needs_change(s) {\n        Cow::Owned(s.replace(\"x\", \"y\"))\n    } else {\n        Cow::Borrowed(s)  // No clone!\n    }\n}\n```\n\n### Cow Variants\n```rust\nenum Cow<'a, B> {\n    Borrowed(&'a B),  // Just a reference\n    Owned(B::Owned),  // Owned data\n}\n```\n\n### Common Use Cases\n- String processing that usually doesn't modify\n- APIs that accept both owned and borrowed\n- Caching with lazy initialization",
+            "confidence": 0.8,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "lifetime-annotation",
+            "pattern": "<'[a-z]",
+            "title": "Lifetime Annotation",
+            "rustTerm": "Lifetimes 'a",
+            "explanation": "Lifetimes tell Rust how long references are valid. They ensure you never have a reference to freed memory.",
+            "example": "// 'a means: the return value lives as long as the input\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}",
+            "deepExplanation": "## Understanding Lifetimes\n\nLifetimes prevent dangling references - references to data that's been freed.\n\n### The Problem\n```rust\nfn longest(x: &str, y: &str) -> &str {\n    if x.len() > y.len() { x } else { y }\n}\n// Error! Rust doesn't know if return value\n// comes from x or y\n```\n\n### The Solution\n```rust\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\n// Now Rust knows: return lives as long as BOTH inputs\n```\n\n### Reading Lifetimes\n- `&'a str` - a reference valid for lifetime 'a\n- `<'a>` - declaring a lifetime parameter\n- `'static` - lives for entire program\n\n### Struct Lifetimes\n```rust\nstruct Parser<'a> {\n    input: &'a str,  // Parser can't outlive input\n}\n```\n\n### Lifetime Elision\nRust infers lifetimes when unambiguous:\n```rust\n// Written:\nfn first(s: &str) -> &str { ... }\n// Rust sees:\nfn first<'a>(s: &'a str) -> &'a str { ... }\n```",
+            "confidence": 0.7,
+            "contexts": [
+                "general",
+                "parser"
+            ]
+        },
+        {
+            "id": "box-heap",
+            "pattern": "Box::|Box<",
+            "title": "Heap Allocation",
+            "rustTerm": "Box<T>",
+            "explanation": "`Box<T>` allocates data on the heap. Use for large data, recursive types, or trait objects.",
+            "example": "// Recursive type needs Box\nenum List {\n    Cons(i32, Box<List>),\n    Nil,\n}\n\n// Trait object\nlet animal: Box<dyn Animal> = Box::new(Dog {});",
+            "deepExplanation": "## Box: Heap Allocation\n\n`Box<T>` puts data on the heap instead of the stack.\n\n### When to Use Box\n\n**1. Recursive types**\n```rust\n// Won't compile - infinite size\nenum List {\n    Cons(i32, List),\n    Nil,\n}\n\n// Works - Box has known size\nenum List {\n    Cons(i32, Box<List>),\n    Nil,\n}\n```\n\n**2. Large data**\n```rust\n// Stack might overflow\nlet big = [0u8; 1_000_000];\n\n// Safe on heap\nlet big = Box::new([0u8; 1_000_000]);\n```\n\n**3. Trait objects**\n```rust\ntrait Draw { fn draw(&self); }\n\nlet shapes: Vec<Box<dyn Draw>> = vec![\n    Box::new(Circle {}),\n    Box::new(Square {}),\n];\n```\n\n### Box is Simple\n- Single owner (unlike Rc/Arc)\n- No runtime cost beyond allocation\n- Automatically deallocated when dropped",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ]
+        }
+    ]
+}

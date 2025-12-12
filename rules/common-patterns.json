@@ -1,0 +1,140 @@
+{
+    "category": "Common Patterns",
+    "rules": [
+        {
+            "id": "builder-pattern",
+            "pattern": "\\.build\\(\\)|Builder\\s*\\{|fn\\s+builder\\(|fn\\s+new\\(\\)",
+            "title": "Builder Pattern",
+            "rustTerm": "builder pattern",
+            "explanation": "Builders let you construct complex objects step by step. Common for types with many optional fields.",
+            "example": "let config = ConfigBuilder::new()\n    .with_name(\"app\")\n    .with_timeout(30)\n    .build();",
+            "deepExplanation": "## Builder Pattern\n\nConstruct complex objects step by step.\n\n### Basic Builder\n```rust\nstruct Server {\n    host: String,\n    port: u16,\n    max_connections: usize,\n}\n\nstruct ServerBuilder {\n    host: String,\n    port: u16,\n    max_connections: usize,\n}\n\nimpl ServerBuilder {\n    fn new() -> Self {\n        ServerBuilder {\n            host: \"localhost\".into(),\n            port: 8080,\n            max_connections: 100,\n        }\n    }\n    \n    fn host(mut self, host: impl Into<String>) -> Self {\n        self.host = host.into();\n        self\n    }\n    \n    fn port(mut self, port: u16) -> Self {\n        self.port = port;\n        self\n    }\n    \n    fn build(self) -> Server {\n        Server {\n            host: self.host,\n            port: self.port,\n            max_connections: self.max_connections,\n        }\n    }\n}\n```\n\n### Usage\n```rust\nlet server = ServerBuilder::new()\n    .host(\"0.0.0.0\")\n    .port(3000)\n    .build();\n```\n\n### derive_builder Crate\n```rust\n#[derive(Builder)]\nstruct Server {\n    host: String,\n    #[builder(default = \"8080\")]\n    port: u16,\n}\n```\n\n### When to Use\n- Many optional parameters\n- Complex validation needed\n- Immutable final object",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "newtype-pattern",
+            "pattern": "struct\\s+\\w+\\s*\\(\\s*\\w+\\s*\\)\\s*;",
+            "title": "Newtype Pattern",
+            "rustTerm": "newtype",
+            "explanation": "Wrap a type in a single-field tuple struct for type safety. Prevents mixing up values of the same underlying type.",
+            "example": "struct UserId(u64);\nstruct PostId(u64);\n// Can't accidentally use UserId where PostId expected",
+            "deepExplanation": "## Newtype Pattern\n\nWrap types for safety and clarity.\n\n### The Problem\n```rust\nfn transfer(from: u64, to: u64, amount: u64) { ... }\n\n// Easy to mix up!\ntransfer(amount, from_id, to_id);  // Compiles but wrong!\n```\n\n### The Solution\n```rust\nstruct AccountId(u64);\nstruct Amount(u64);\n\nfn transfer(from: AccountId, to: AccountId, amount: Amount) { ... }\n\n// Now this won't compile:\ntransfer(amount, from_id, to_id);  // Type error!\n```\n\n### Adding Functionality\n```rust\n#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]\nstruct UserId(u64);\n\nimpl UserId {\n    fn new(id: u64) -> Self {\n        UserId(id)\n    }\n    \n    fn as_u64(&self) -> u64 {\n        self.0\n    }\n}\n\nimpl Display for UserId {\n    fn fmt(&self, f: &mut Formatter) -> fmt::Result {\n        write!(f, \"user:{}\", self.0)\n    }\n}\n```\n\n### Deref for Convenience\n```rust\nuse std::ops::Deref;\n\nimpl Deref for UserId {\n    type Target = u64;\n    fn deref(&self) -> &u64 {\n        &self.0\n    }\n}\n\nlet id = UserId(42);\nprintln!(\"{}\", *id);  // Access inner value\n```\n\n### Zero-Cost\n```rust\n// Same memory layout as the inner type\nassert_eq!(size_of::<UserId>(), size_of::<u64>());\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "cow-pattern",
+            "pattern": "Cow<|Cow::",
+            "title": "Clone-on-Write",
+            "rustTerm": "Cow<T>",
+            "explanation": "Cow (Clone on Write) delays cloning until mutation is needed. Use for APIs that may or may not need to modify data.",
+            "example": "fn process(s: Cow<str>) -> Cow<str> {\n    if needs_modification(&s) {\n        Cow::Owned(s.to_uppercase())\n    } else {\n        s  // No clone needed\n    }\n}",
+            "deepExplanation": "## Cow - Clone on Write\n\nDelay cloning until actually needed.\n\n### The Problem\n```rust\n// Always clones, even if not needed\nfn maybe_modify(s: &str) -> String {\n    if needs_change(s) {\n        s.to_uppercase()\n    } else {\n        s.to_string()  // Unnecessary clone!\n    }\n}\n```\n\n### With Cow\n```rust\nuse std::borrow::Cow;\n\nfn maybe_modify(s: &str) -> Cow<str> {\n    if needs_change(s) {\n        Cow::Owned(s.to_uppercase())\n    } else {\n        Cow::Borrowed(s)  // No clone!\n    }\n}\n```\n\n### Cow Variants\n```rust\nenum Cow<'a, B: ToOwned> {\n    Borrowed(&'a B),\n    Owned(B::Owned),\n}\n\n// For str:\nCow::Borrowed(&str)\nCow::Owned(String)\n```\n\n### Common Uses\n```rust\n// String processing\nfn escape(s: &str) -> Cow<str> {\n    if s.contains('<') {\n        Cow::Owned(s.replace('<', \"&lt;\"))\n    } else {\n        Cow::Borrowed(s)\n    }\n}\n\n// Accept both borrowed and owned\nfn process(data: Cow<[u8]>) { ... }\n```\n\n### to_mut() for Lazy Clone\n```rust\nlet mut s: Cow<str> = Cow::Borrowed(\"hello\");\ns.to_mut().push_str(\" world\");  // Clones here if borrowed\n```",
+            "confidence": 0.7,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "entry-api",
+            "pattern": "\\.entry\\(|\\.or_insert\\(|\\.or_insert_with\\(",
+            "title": "HashMap Entry API",
+            "rustTerm": "Entry API",
+            "explanation": "The Entry API lets you check and modify HashMap entries in one operation. Avoids double lookups.",
+            "example": "*map.entry(key).or_insert(0) += 1;\n// Increment count, inserting 0 if missing",
+            "suggestedFix": {
+                "description": "Use or_insert_with for lazy evaluation",
+                "before": ".or_insert(",
+                "after": ".or_insert_with(|| "
+            },
+            "deepExplanation": "## HashMap Entry API\n\nEfficient check-and-modify in one lookup.\n\n### The Problem\n```rust\n// Two lookups!\nif !map.contains_key(&key) {\n    map.insert(key, default);\n}\nlet value = map.get_mut(&key).unwrap();\n```\n\n### With Entry API\n```rust\n// One lookup!\nlet value = map.entry(key).or_insert(default);\n```\n\n### Common Patterns\n\n**Counting:**\n```rust\nlet mut counts: HashMap<char, u32> = HashMap::new();\n\nfor c in text.chars() {\n    *counts.entry(c).or_insert(0) += 1;\n}\n```\n\n**Grouping:**\n```rust\nlet mut groups: HashMap<String, Vec<Item>> = HashMap::new();\n\nfor item in items {\n    groups.entry(item.category.clone())\n        .or_insert_with(Vec::new)\n        .push(item);\n}\n```\n\n**Lazy initialization:**\n```rust\nlet value = cache\n    .entry(key)\n    .or_insert_with(|| expensive_computation());\n```\n\n### Entry Variants\n```rust\nmap.entry(key)\n    .or_insert(default)           // Insert if missing\n    .or_insert_with(|| compute()) // Lazy insert\n    .or_default()                 // Insert Default::default()\n    .and_modify(|v| *v += 1)      // Modify if exists\n```\n\n### Match on Entry\n```rust\nuse std::collections::hash_map::Entry;\n\nmatch map.entry(key) {\n    Entry::Occupied(e) => println!(\"exists: {}\", e.get()),\n    Entry::Vacant(e) => { e.insert(default); }\n}\n```",
+            "confidence": 0.7,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "vec-capacity",
+            "pattern": "Vec::with_capacity|with_capacity\\(",
+            "title": "Pre-allocating Vec",
+            "rustTerm": "Vec::with_capacity",
+            "explanation": "Pre-allocate when you know the size. Avoids reallocations as the Vec grows.",
+            "example": "// Know we'll have 1000 items\nlet mut v = Vec::with_capacity(1000);\nfor i in 0..1000 {\n    v.push(i);  // No reallocations!\n}",
+            "deepExplanation": "## Vec::with_capacity\n\nAvoid reallocations by pre-allocating.\n\n### The Problem\n```rust\nlet mut v = Vec::new();\nfor i in 0..10000 {\n    v.push(i);  // Reallocates ~14 times!\n}\n```\n\n### The Solution\n```rust\nlet mut v = Vec::with_capacity(10000);\nfor i in 0..10000 {\n    v.push(i);  // Zero reallocations\n}\n```\n\n### When to Use\n```rust\n// Transforming a collection\nlet mut result = Vec::with_capacity(source.len());\nfor item in source {\n    result.push(transform(item));\n}\n\n// Even better - use collect\nlet result: Vec<_> = source.iter().map(transform).collect();\n// collect() often pre-allocates automatically!\n```\n\n### Checking Capacity\n```rust\nlet mut v = Vec::with_capacity(10);\nassert!(v.capacity() >= 10);\nassert_eq!(v.len(), 0);  // Capacity != length\n\nv.push(1);\nassert_eq!(v.len(), 1);\nassert!(v.capacity() >= 10);  // Still has room\n```\n\n### Similar Methods\n```rust\nString::with_capacity(100)\nHashMap::with_capacity(50)\nHashSet::with_capacity(50)\n```\n\n### reserve() for Growing\n```rust\nlet mut v = vec![1, 2, 3];\nv.reserve(1000);  // Add more capacity\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "option-methods",
+            "pattern": "\\.is_some\\(\\)|\\.is_none\\(\\)|\\.as_ref\\(\\)|\\.as_mut\\(\\)|\\.take\\(\\)",
+            "title": "Option Methods",
+            "rustTerm": "Option methods",
+            "explanation": "Option has many useful methods beyond unwrap. Use them to write cleaner code.",
+            "example": "opt.as_ref()      // &Option<T> -> Option<&T>\nopt.take()        // Take value, leave None\nopt.is_some()     // Check without consuming",
+            "deepExplanation": "## Option Methods\n\nBeyond unwrap and match.\n\n### Checking\n```rust\nif opt.is_some() { ... }\nif opt.is_none() { ... }\n```\n\n### Borrowing\n```rust\nlet opt = Some(String::from(\"hello\"));\n\n// as_ref: Option<T> -> Option<&T>\nif let Some(s) = opt.as_ref() {\n    println!(\"{}\", s);  // Borrows, opt still valid\n}\n\n// as_mut: Option<T> -> Option<&mut T>\nif let Some(s) = opt.as_mut() {\n    s.push_str(\" world\");\n}\n```\n\n### Taking and Replacing\n```rust\nlet mut opt = Some(42);\n\n// take(): Take value, leave None\nlet val = opt.take();  // val = Some(42), opt = None\n\n// replace(): Put new value, return old\nlet old = opt.replace(100);  // old = None, opt = Some(100)\n```\n\n### Transforming\n```rust\nopt.map(|x| x * 2)        // Some(2) -> Some(4)\nopt.filter(|x| *x > 0)    // Keep if predicate true\nopt.and_then(|x| other())  // Chain Options\nopt.or(other_opt)          // Fallback Option\nopt.or_else(|| compute())  // Lazy fallback\n```\n\n### Default Values\n```rust\nopt.unwrap_or(default)       // Use default if None\nopt.unwrap_or_else(|| calc()) // Lazy default\nopt.unwrap_or_default()       // Use Default trait\n```\n\n### Converting\n```rust\nopt.ok_or(err)       // Option -> Result\nopt.ok_or_else(|| e) // Option -> Result (lazy)\n```",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "result-methods",
+            "pattern": "\\.is_ok\\(\\)|\\.is_err\\(\\)|\\.ok\\(\\)|\\.err\\(\\)",
+            "title": "Result Methods",
+            "rustTerm": "Result methods",
+            "explanation": "Result has many methods for transformation and combination. Use them instead of explicit matching.",
+            "example": "result.ok()        // Result<T,E> -> Option<T>\nresult.err()       // Result<T,E> -> Option<E>\nresult.is_ok()     // Check success",
+            "deepExplanation": "## Result Methods\n\nBeyond match and ?.\n\n### Checking\n```rust\nif result.is_ok() { ... }\nif result.is_err() { ... }\n```\n\n### Converting to Option\n```rust\nlet opt: Option<i32> = result.ok();   // Discard error\nlet opt: Option<E> = result.err();    // Discard success\n```\n\n### Transforming\n```rust\n// Map success value\nresult.map(|v| v * 2)\n\n// Map error\nresult.map_err(|e| format!(\"Error: {}\", e))\n\n// Chain Results\nresult.and_then(|v| another_operation(v))\n\n// Fallback on error\nresult.or(other_result)\nresult.or_else(|e| recover(e))\n```\n\n### Default on Error\n```rust\nresult.unwrap_or(default)\nresult.unwrap_or_else(|e| handle(e))\nresult.unwrap_or_default()\n```\n\n### Both Success and Error\n```rust\nmatch result {\n    Ok(v) => ...,\n    Err(e) => ...,\n}\n\n// Or with map\nresult.map_or_else(\n    |e| format!(\"error: {}\", e),\n    |v| format!(\"success: {}\", v)\n)\n```\n\n### Transpose\n```rust\n// Option<Result<T, E>> <-> Result<Option<T>, E>\nlet opt_result: Option<Result<i32, E>> = Some(Ok(42));\nlet result_opt: Result<Option<i32>, E> = opt_result.transpose();\n```",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "string-concat",
+            "pattern": "format!\\(|push_str\\(|\\+\\s*&",
+            "title": "String Concatenation",
+            "rustTerm": "string operations",
+            "explanation": "Use format!, push_str, or + for string concatenation. Each has different ownership semantics.",
+            "example": "// format! - creates new String\nlet s = format!(\"{} {}\", first, second);\n\n// push_str - mutates in place\ns.push_str(\" world\");",
+            "deepExplanation": "## String Concatenation\n\nDifferent methods for different needs.\n\n### format! Macro\n```rust\nlet name = \"Alice\";\nlet age = 30;\nlet s = format!(\"{} is {} years old\", name, age);\n// Creates new String, doesn't consume arguments\n```\n\n### push_str Method\n```rust\nlet mut s = String::from(\"hello\");\ns.push_str(\" world\");  // Mutates in place\ns.push('!');           // Single char\n```\n\n### + Operator\n```rust\nlet s1 = String::from(\"hello\");\nlet s2 = \" world\";\nlet s3 = s1 + s2;  // s1 is moved!\n// Note: left side must be String, right must be &str\n```\n\n### Performance Comparison\n```rust\n// Many concatenations - use String::with_capacity\nlet mut result = String::with_capacity(1000);\nfor s in strings {\n    result.push_str(s);\n}\n\n// Or join\nlet result = strings.join(\", \");\n\n// Avoid repeated format! in loops\n```\n\n### concat! Macro\n```rust\n// Compile-time concatenation of literals\nconst MSG: &str = concat!(\"Hello\", \" \", \"World\");\n```\n\n### When to Use What\n| Method | Use when |\n|--------|----------|\n| `format!` | Formatting with placeholders |\n| `push_str` | Building up a string |\n| `+` | Simple one-time concat |\n| `join` | Combining iterator of strings |",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "drop-guard",
+            "pattern": "impl\\s+Drop|fn\\s+drop\\(|drop\\(",
+            "title": "Drop and RAII",
+            "rustTerm": "Drop trait",
+            "explanation": "Drop runs cleanup code when a value goes out of scope. Rust's RAII pattern ensures resources are freed.",
+            "example": "impl Drop for MyResource {\n    fn drop(&mut self) {\n        self.cleanup();\n    }\n}",
+            "deepExplanation": "## Drop and RAII\n\nAutomatic cleanup when values go out of scope.\n\n### How It Works\n```rust\n{\n    let file = File::open(\"data.txt\").unwrap();\n    // Use file...\n}  // file.drop() called automatically, closes handle\n```\n\n### Implementing Drop\n```rust\nstruct TempFile {\n    path: PathBuf,\n}\n\nimpl Drop for TempFile {\n    fn drop(&mut self) {\n        let _ = std::fs::remove_file(&self.path);\n    }\n}\n\n// File deleted when temp goes out of scope\nlet temp = TempFile { path: \"temp.txt\".into() };\n```\n\n### Drop Order\n```rust\nstruct A;\nstruct B;\n\nimpl Drop for A { fn drop(&mut self) { println!(\"A dropped\"); } }\nimpl Drop for B { fn drop(&mut self) { println!(\"B dropped\"); } }\n\n{\n    let _a = A;\n    let _b = B;\n}  // Prints: B dropped, then A dropped (reverse order)\n```\n\n### Manual Drop\n```rust\nlet resource = acquire_resource();\n// ... use resource ...\ndrop(resource);  // Force early cleanup\n// ... do other things ...\n```\n\n### Drop Guard Pattern\n```rust\nstruct Guard<'a>(&'a mut bool);\n\nimpl<'a> Drop for Guard<'a> {\n    fn drop(&mut self) {\n        *self.0 = false;  // Always runs, even on panic\n    }\n}\n\n*flag = true;\nlet _guard = Guard(&mut flag);\n// flag set to false when _guard dropped\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "interior-mutability",
+            "pattern": "Cell<|RefCell<|UnsafeCell<|Mutex<|RwLock<",
+            "title": "Interior Mutability",
+            "rustTerm": "interior mutability",
+            "explanation": "Interior mutability lets you mutate through shared references. Use Cell/RefCell for single-threaded, Mutex/RwLock for multi-threaded.",
+            "example": "let data = RefCell::new(vec![]);\ndata.borrow_mut().push(1);  // Mutate through shared ref",
+            "deepExplanation": "## Interior Mutability\n\nMutate data even with only a shared reference.\n\n### Why Needed\n```rust\nstruct Counter {\n    count: u32,\n}\n\nimpl Counter {\n    fn increment(&self) {  // Only &self\n        self.count += 1;   // Error! Can't mutate\n    }\n}\n```\n\n### Cell - For Copy Types\n```rust\nuse std::cell::Cell;\n\nstruct Counter {\n    count: Cell<u32>,\n}\n\nimpl Counter {\n    fn increment(&self) {\n        self.count.set(self.count.get() + 1);\n    }\n}\n```\n\n### RefCell - For Non-Copy Types\n```rust\nuse std::cell::RefCell;\n\nstruct Data {\n    items: RefCell<Vec<i32>>,\n}\n\nimpl Data {\n    fn add(&self, item: i32) {\n        self.items.borrow_mut().push(item);\n    }\n    \n    fn count(&self) -> usize {\n        self.items.borrow().len()\n    }\n}\n```\n\n### RefCell Runtime Checks\n```rust\nlet cell = RefCell::new(5);\nlet r1 = cell.borrow();\nlet r2 = cell.borrow();     // OK: multiple immutable\n// let w = cell.borrow_mut(); // PANIC: can't borrow mut while borrowed\n```\n\n### Thread-Safe Versions\n| Single-threaded | Multi-threaded |\n|-----------------|----------------|\n| `Cell<T>` | `Mutex<T>` (exclusive) |\n| `RefCell<T>` | `RwLock<T>` (read/write) |\n\n### When to Use\n- Caching/memoization in immutable API\n- Shared ownership with mutation (Rc<RefCell<T>>)\n- Counting references internally",
+            "confidence": 0.7,
+            "contexts": [
+                "general"
+            ]
+        }
+    ]
+}

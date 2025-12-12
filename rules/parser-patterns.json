@@ -1,0 +1,45 @@
+{
+    "category": "Parser Patterns",
+    "rules": [
+        {
+            "id": "lexer-peekable-chars",
+            "pattern": "\\.chars\\(\\)",
+            "title": "Character Iteration",
+            "rustTerm": ".chars() iterator",
+            "explanation": "`.chars()` iterates over Unicode scalar values. For lexers/parsers, wrap in `.peekable()` for lookahead capability.",
+            "example": "let mut chars = input.chars().peekable();\nwhile let Some(&c) = chars.peek() {\n    match c {\n        '<' => self.read_tag(&mut chars),\n        _ => self.read_text(&mut chars),\n    }\n}",
+            "deepExplanation": "## Building a Lexer with `.chars()`\n\n### Basic Setup\n```rust\nstruct Lexer<'a> {\n    chars: std::iter::Peekable<std::str::Chars<'a>>,\n    position: usize,\n}\n\nimpl<'a> Lexer<'a> {\n    fn new(input: &'a str) -> Self {\n        Self {\n            chars: input.chars().peekable(),\n            position: 0,\n        }\n    }\n}\n```\n\n### Lookahead Pattern\n```rust\nfn peek(&mut self) -> Option<char> {\n    self.chars.peek().copied()\n}\n\nfn advance(&mut self) -> Option<char> {\n    let c = self.chars.next();\n    if c.is_some() {\n        self.position += 1;\n    }\n    c\n}\n\nfn read_while<F>(&mut self, pred: F) -> String\nwhere\n    F: Fn(char) -> bool,\n{\n    let mut result = String::new();\n    while let Some(&c) = self.chars.peek() {\n        if pred(c) {\n            result.push(c);\n            self.chars.next();\n        } else {\n            break;\n        }\n    }\n    result\n}\n```\n\n### XML Tag Example\n```rust\nfn read_tag_name(&mut self) -> String {\n    self.read_while(|c| c.is_alphanumeric() || c == '_')\n}\n```\n\n### ⚠️ UTF-8 Warning\n`.chars()` handles Unicode correctly, but `position` counts chars, not bytes!",
+            "confidence": 0.8,
+            "contexts": [
+                "parser"
+            ]
+        },
+        {
+            "id": "match-exhaustive",
+            "pattern": "match\\s+\\w+\\s*\\{",
+            "title": "Pattern Matching",
+            "rustTerm": "match expression",
+            "explanation": "Rust's `match` must be exhaustive. Use `_` for catch-all or `..` to ignore remaining fields.",
+            "example": "match token {\n    Token::OpenTag(name) => { ... }\n    Token::CloseTag(name) => { ... }\n    Token::Text(s) => { ... }\n    _ => { /* catch-all */ }\n}",
+            "deepExplanation": "## Exhaustive Pattern Matching\n\nRust requires you to handle ALL possible cases in a `match`.\n\n### Basic Pattern\n```rust\nmatch value {\n    Pattern1 => expr1,\n    Pattern2 => expr2,\n    _ => default_expr, // Catch-all\n}\n```\n\n### Enum Matching (no catch-all needed)\n```rust\nenum Token {\n    Number(i64),\n    String(String),\n    Eof,\n}\n\nmatch token {\n    Token::Number(n) => println!(\"num: {}\", n),\n    Token::String(s) => println!(\"str: {}\", s),\n    Token::Eof => println!(\"done\"),\n    // No _ needed - all variants covered!\n}\n```\n\n### Guards\n```rust\nmatch c {\n    c if c.is_alphabetic() => read_identifier(),\n    c if c.is_numeric() => read_number(),\n    '<' => read_tag(),\n    _ => skip(),\n}\n```\n\n### Destructuring\n```rust\nmatch result {\n    Ok(Token::Tag { name, attrs }) => { ... }\n    Ok(Token::Text(s)) if !s.is_empty() => { ... }\n    Err(e) => return Err(e),\n    _ => { ... }\n}\n```\n\n### `if let` for single pattern\n```rust\nif let Some(Token::Tag { name, .. }) = next_token {\n    process_tag(name);\n}\n```",
+            "confidence": 0.3,
+            "contexts": [
+                "general",
+                "parser"
+            ]
+        },
+        {
+            "id": "state-machine-enum",
+            "pattern": "enum\\s+\\w+State|State\\s*\\{",
+            "title": "State Machine Pattern",
+            "rustTerm": "Enum-based state machine",
+            "explanation": "Enums are perfect for state machines in parsers. Each variant represents a state, and you match on transitions.",
+            "example": "enum LexerState {\n    Default,\n    InTag,\n    InAttribute,\n    InString(char), // Tracks quote type\n}\n\nmatch state {\n    LexerState::Default if c == '<' => {\n        state = LexerState::InTag;\n    }\n    ...\n}",
+            "deepExplanation": "## State Machines with Enums\n\nEnums + match = type-safe state machines.\n\n### Parser State Example\n```rust\nenum ParserState {\n    ExpectingElement,\n    InOpenTag { name: String },\n    InCloseTag { name: String },\n    InContent,\n    InAttribute { tag: String, attr: String },\n}\n\nstruct Parser {\n    state: ParserState,\n    stack: Vec<String>, // Tag stack for nesting\n}\n\nimpl Parser {\n    fn process(&mut self, token: Token) -> Result<(), Error> {\n        self.state = match (&self.state, token) {\n            (ParserState::ExpectingElement, Token::OpenTag(name)) => {\n                self.stack.push(name.clone());\n                ParserState::InOpenTag { name }\n            }\n            (ParserState::InOpenTag { name }, Token::CloseTag(close)) \n                if name == &close => {\n                self.stack.pop();\n                ParserState::ExpectingElement\n            }\n            // ... more transitions\n            _ => return Err(Error::UnexpectedToken),\n        };\n        Ok(())\n    }\n}\n```\n\n### Benefits\n- Compiler ensures all states handled\n- States can carry data\n- Invalid states are unrepresentable",
+            "confidence": 0.9,
+            "contexts": [
+                "parser"
+            ]
+        }
+    ]
+}

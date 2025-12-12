@@ -1,0 +1,114 @@
+{
+    "category": "Pattern Matching",
+    "rules": [
+        {
+            "id": "match-exhaustive",
+            "pattern": "match\\s+\\w+",
+            "title": "Exhaustive Pattern Matching",
+            "rustTerm": "match expression",
+            "explanation": "Rust's match is exhaustive - you must handle all possible cases. Use `_` as a catch-all or explicitly list variants.",
+            "example": "match result {\n    Ok(value) => use_value(value),\n    Err(e) => handle_error(e),\n}",
+            "suggestedFix": {
+                "description": "Use if-let for single pattern",
+                "before": "match ",
+                "after": "if let Some(v) = "
+            },
+            "deepExplanation": "## Exhaustive Matching\n\nRust forces you to handle every possible case. This prevents bugs from forgotten cases.\n\n### Basic Match\n```rust\nenum Direction { North, South, East, West }\n\nlet dir = Direction::North;\nmatch dir {\n    Direction::North => println!(\"Going up\"),\n    Direction::South => println!(\"Going down\"),\n    Direction::East => println!(\"Going right\"),\n    Direction::West => println!(\"Going left\"),\n}  // Must cover all 4!\n```\n\n### Catch-All with `_`\n```rust\nmatch value {\n    0 => println!(\"zero\"),\n    1 => println!(\"one\"),\n    _ => println!(\"something else\"),  // Catch-all\n}\n```\n\n### Binding with `_`\n```rust\nmatch pair {\n    (0, y) => println!(\"y is {}\", y),\n    (x, 0) => println!(\"x is {}\", x),\n    (_, _) => println!(\"Neither is zero\"),\n}\n```\n\n### Match is an Expression\n```rust\nlet description = match status {\n    200 => \"OK\",\n    404 => \"Not Found\",\n    500 => \"Server Error\",\n    _ => \"Unknown\",\n};\n```",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "match-guards",
+            "pattern": "=>.*if\\s+",
+            "title": "Match Guards",
+            "rustTerm": "pattern guards",
+            "explanation": "Match guards add extra conditions with `if`. The pattern must match AND the guard must be true.",
+            "example": "match num {\n    n if n < 0 => \"negative\",\n    n if n > 0 => \"positive\",\n    _ => \"zero\",\n}",
+            "deepExplanation": "## Match Guards\n\nGuards let you add conditions beyond pattern matching.\n\n### Basic Guard\n```rust\nmatch x {\n    n if n < 0 => println!(\"negative\"),\n    n if n > 0 => println!(\"positive\"),\n    _ => println!(\"zero\"),\n}\n```\n\n### Guard with Binding\n```rust\nmatch pair {\n    (x, y) if x == y => println!(\"equal\"),\n    (x, y) if x > y => println!(\"x is bigger\"),\n    (x, y) => println!(\"y is bigger\"),\n}\n```\n\n### Guard on Enum Variants\n```rust\nenum Message {\n    Data(Vec<u8>),\n    Error(String),\n}\n\nmatch msg {\n    Message::Data(d) if d.is_empty() => println!(\"empty data\"),\n    Message::Data(d) => process(d),\n    Message::Error(e) => eprintln!(\"{}\", e),\n}\n```\n\n### Warning: Guards Don't Bind\n```rust\n// This doesn't work as expected:\nmatch opt {\n    Some(x) if x > 0 => ...,\n    Some(x) => ...,  // x can still be <= 0!\n    None => ...,\n}\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "at-binding",
+            "pattern": "\\w+\\s*@",
+            "title": "@ Binding Pattern",
+            "rustTerm": "@ binding",
+            "explanation": "The `@` operator lets you bind a name to a value while also testing it against a pattern.",
+            "example": "match msg {\n    Message::Data(d @ 1..=100) => println!(\"small: {}\", d),\n    _ => {},\n}",
+            "deepExplanation": "## The @ Binding\n\nBind a name while also matching a pattern.\n\n### Basic Usage\n```rust\nmatch x {\n    n @ 1..=5 => println!(\"small: {}\", n),\n    n @ 6..=10 => println!(\"medium: {}\", n),\n    n => println!(\"large: {}\", n),\n}\n```\n\n### With Structs\n```rust\nstruct Point { x: i32, y: i32 }\n\nmatch point {\n    p @ Point { x: 0, .. } => println!(\"on y-axis: {:?}\", p),\n    p @ Point { y: 0, .. } => println!(\"on x-axis: {:?}\", p),\n    p => println!(\"somewhere: {:?}\", p),\n}\n```\n\n### With Enums\n```rust\nmatch msg {\n    m @ Message::Quit => {\n        log(\"Quitting\");\n        handle(m);  // Can use the bound value\n    },\n    _ => {},\n}\n```\n\n### When to Use\n- You need to match a pattern AND use the whole value\n- Destructuring would lose information you need\n- Logging/debugging while matching",
+            "confidence": 0.7,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "or-patterns",
+            "pattern": "\\|\\s*[A-Z]",
+            "title": "Or Patterns",
+            "rustTerm": "| in patterns",
+            "explanation": "Use `|` to match multiple patterns with the same arm. All patterns must bind the same variables.",
+            "example": "match c {\n    'a' | 'e' | 'i' | 'o' | 'u' => \"vowel\",\n    _ => \"consonant\",\n}",
+            "deepExplanation": "## Or Patterns with `|`\n\nMatch multiple patterns with one arm.\n\n### Basic Usage\n```rust\nmatch c {\n    'a' | 'e' | 'i' | 'o' | 'u' => \"vowel\",\n    '0'..='9' => \"digit\",\n    _ => \"other\",\n}\n```\n\n### With Enums\n```rust\nenum Status {\n    Active,\n    Pending,\n    Inactive,\n    Deleted,\n}\n\nmatch status {\n    Status::Active | Status::Pending => \"in progress\",\n    Status::Inactive | Status::Deleted => \"done\",\n}\n```\n\n### With Bindings (must match!)\n```rust\n// Works - both patterns bind 'n'\nmatch value {\n    Some(n) | Ok(n) => println!(\"{}\", n),  // Won't compile - types differ\n    _ => {},\n}\n\n// Better: same types\nmatch opt {\n    Some(0) | Some(1) => \"zero or one\",\n    Some(n) => \"other number\",\n    None => \"nothing\",\n}\n```\n\n### In if-let\n```rust\nif let Some(x) | None = opt {  // Won't work - None doesn't bind x\n    ...\n}\n```",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "destructuring",
+            "pattern": "let\\s+\\([^)]+\\)|let\\s+\\{[^}]+\\}",
+            "title": "Destructuring",
+            "rustTerm": "pattern destructuring",
+            "explanation": "Destructuring lets you pull apart structs, tuples, and enums in one step. Very common in Rust.",
+            "example": "let (x, y) = point;\nlet Point { x, y } = point;\nlet [first, rest @ ..] = slice;",
+            "deepExplanation": "## Destructuring Patterns\n\n### Tuples\n```rust\nlet pair = (10, 20);\nlet (x, y) = pair;\n\n// Ignore with _\nlet (first, _) = pair;\n```\n\n### Structs\n```rust\nstruct Point { x: i32, y: i32 }\nlet p = Point { x: 10, y: 20 };\n\n// Full destructure\nlet Point { x, y } = p;\n\n// Rename\nlet Point { x: a, y: b } = p;\n\n// Partial with ..\nlet Point { x, .. } = p;\n```\n\n### Nested\n```rust\nstruct Line { start: Point, end: Point }\nlet line = Line { ... };\n\nlet Line { start: Point { x: x1, y: y1 }, .. } = line;\n```\n\n### In Function Parameters\n```rust\nfn distance((x1, y1): (f64, f64), (x2, y2): (f64, f64)) -> f64 {\n    ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt()\n}\n```\n\n### Slices\n```rust\nlet arr = [1, 2, 3, 4, 5];\nlet [first, second, rest @ ..] = arr;\n// first = 1, second = 2, rest = [3, 4, 5]\n```",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "ref-pattern",
+            "pattern": "ref\\s+\\w+|ref\\s+mut\\s+\\w+",
+            "title": "ref in Patterns",
+            "rustTerm": "ref pattern",
+            "explanation": "Use `ref` in patterns to borrow instead of move. Often needed when matching on owned values.",
+            "example": "match owned_value {\n    ref r => println!(\"{}\", r),  // Borrows\n}",
+            "deepExplanation": "## The ref Pattern\n\n`ref` creates a reference when matching, instead of moving.\n\n### The Problem\n```rust\nlet opt = Some(String::from(\"hello\"));\n\nmatch opt {\n    Some(s) => println!(\"{}\", s),  // s: String (moved!)\n    None => {},\n}\n// opt is now partially moved\n```\n\n### The Solution\n```rust\nmatch opt {\n    Some(ref s) => println!(\"{}\", s),  // s: &String\n    None => {},\n}\n// opt is still valid\n```\n\n### ref mut for Mutable Borrow\n```rust\nmatch opt {\n    Some(ref mut s) => s.push_str(\" world\"),\n    None => {},\n}\n```\n\n### Modern Alternative\nMatch on a reference instead:\n```rust\nmatch &opt {\n    Some(s) => println!(\"{}\", s),  // s: &String automatically\n    None => {},\n}\n\n// Or use as_ref()\nif let Some(s) = opt.as_ref() {\n    println!(\"{}\", s);\n}\n```\n\n### When You Still Need ref\n- Inside structs/enums where you can't add `&`\n- When you need `ref mut` specifically",
+            "confidence": 0.7,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "let-else",
+            "pattern": "let\\s+\\w+\\s*=.*else\\s*\\{",
+            "title": "Let-Else Pattern",
+            "rustTerm": "let-else",
+            "explanation": "Let-else provides early return when a pattern doesn't match. Great for reducing nesting.",
+            "example": "let Some(value) = opt else {\n    return Err(\"No value\");\n};",
+            "deepExplanation": "## Let-Else (Rust 1.65+)\n\nEarly return when a pattern doesn't match.\n\n### Before: Nested if-let\n```rust\nfn process(opt: Option<i32>) -> Result<i32, &'static str> {\n    if let Some(x) = opt {\n        if x > 0 {\n            Ok(x * 2)\n        } else {\n            Err(\"must be positive\")\n        }\n    } else {\n        Err(\"missing value\")\n    }\n}\n```\n\n### After: Let-Else\n```rust\nfn process(opt: Option<i32>) -> Result<i32, &'static str> {\n    let Some(x) = opt else {\n        return Err(\"missing value\");\n    };\n    \n    if x <= 0 {\n        return Err(\"must be positive\");\n    }\n    \n    Ok(x * 2)\n}\n```\n\n### The else Must Diverge\n```rust\nlet Some(x) = opt else {\n    return;        // OK\n    // or panic!() // OK\n    // or continue // OK in loops\n    // or break    // OK in loops\n};\n// Can't just assign a default here\n```\n\n### Common Patterns\n```rust\n// Parse or return error\nlet Ok(num) = input.parse::<i32>() else {\n    return Err(\"invalid number\");\n};\n\n// Find or continue\nfor item in items {\n    let Some(value) = item.get_value() else {\n        continue;\n    };\n    process(value);\n}\n```",
+            "confidence": 0.8,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "matches-macro",
+            "pattern": "matches!\\s*\\(",
+            "title": "matches! Macro",
+            "rustTerm": "matches!",
+            "explanation": "The `matches!` macro returns `true` if an expression matches a pattern. Cleaner than match with true/false.",
+            "example": "// Instead of: match x { Some(_) => true, _ => false }\nif matches!(x, Some(_)) {\n    // ...\n}",
+            "deepExplanation": "## The matches! Macro\n\nChecks if a value matches a pattern, returns bool.\n\n### Basic Usage\n```rust\nlet x = Some(42);\n\n// Old way\nlet is_some = match x {\n    Some(_) => true,\n    None => false,\n};\n\n// With matches!\nlet is_some = matches!(x, Some(_));\n```\n\n### With Guards\n```rust\nlet is_positive = matches!(x, Some(n) if n > 0);\n```\n\n### With Or Patterns\n```rust\nlet is_vowel = matches!(c, 'a' | 'e' | 'i' | 'o' | 'u');\n```\n\n### In Iterators\n```rust\nlet has_errors = results.iter().any(|r| matches!(r, Err(_)));\nlet successes = results.iter().filter(|r| matches!(r, Ok(_)));\n```\n\n### Enum Variant Checking\n```rust\nenum State { Running, Paused, Stopped }\n\nlet is_active = matches!(state, State::Running | State::Paused);\n```\n\n### When to Use\n- Boolean check on pattern\n- In `filter()`, `any()`, `all()`\n- Replacing verbose match expressions",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ]
+        }
+    ]
+}

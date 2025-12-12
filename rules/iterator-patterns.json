@@ -1,0 +1,212 @@
+{
+    "category": "Iterator Patterns",
+    "rules": [
+        {
+            "id": "iterator-next-without-peekable",
+            "pattern": "\\.next\\(\\)",
+            "title": "Iterator Consumption",
+            "rustTerm": "Iterator::next()",
+            "officialDoc": "https://doc.rust-lang.org/std/iter/trait.Iterator.html#tymethod.next",
+            "explanation": "This consumes the next item from the iterator. If you need to look ahead without consuming, wrap your iterator in `.peekable()`.",
+            "example": "let mut chars = input.chars().peekable();\nif let Some(&next) = chars.peek() {\n    // Look ahead without consuming\n}",
+            "deepExplanation": "## Why `.peekable()`?\n\n`.next()` removes and returns the next item from the iterator permanently. In lexers and parsers, you often need to **look ahead** to decide what to do next.\n\n### The Problem\n```rust\nlet c = chars.next(); // Item is gone!\n// Can't put it back if we didn't want it\n```\n\n### The Solution\n```rust\nlet mut chars = input.chars().peekable();\nif let Some(&c) = chars.peek() {\n    // We can see 'c' without consuming it\n    if c == '<' {\n        chars.next(); // Now consume it\n    }\n}\n```\n\n### When to use\n- **Lexers**: Deciding token boundaries\n- **Parsers**: Lookahead for grammar rules\n- **State machines**: Conditional transitions",
+            "confidence": 0.7,
+            "contexts": [
+                "parser",
+                "general"
+            ],
+            "suggestedFix": {
+                "description": "Consider using .peekable() for lookahead",
+                "before": ".chars()",
+                "after": ".chars().peekable()"
+            }
+        },
+        {
+            "id": "iter-vs-into-iter",
+            "pattern": "\\.iter\\(\\)",
+            "title": "Borrowing Iterator",
+            "rustTerm": ".iter() vs .into_iter()",
+            "officialDoc": "https://doc.rust-lang.org/std/iter/trait.IntoIterator.html",
+            "explanation": "`.iter()` borrows items (`&T`). Use `.into_iter()` to take ownership, or `.iter_mut()` for mutable borrows.",
+            "example": "// Borrow: vec.iter()      -> &T\n// Own:    vec.into_iter() -> T\n// Mutate: vec.iter_mut()  -> &mut T",
+            "deepExplanation": "## Choosing the Right Iterator\n\n| Method | Yields | Use when |\n|--------|--------|----------|\n| `.iter()` | `&T` | You need to read items, keep the collection |\n| `.iter_mut()` | `&mut T` | You need to modify items in place |\n| `.into_iter()` | `T` | You want to consume/transform the collection |\n\n### Example\n```rust\nlet names = vec![\"Alice\", \"Bob\"];\n\n// Borrow - names still usable after\nfor name in names.iter() {\n    println!(\"{}\", name);\n}\n\n// Consume - names moved\nlet upper: Vec<_> = names.into_iter()\n    .map(|s| s.to_uppercase())\n    .collect();\n```\n\n### Rule of Thumb\n- Default to `.iter()` (borrow)\n- Use `.into_iter()` when you're done with the collection\n- Use `.iter_mut()` sparingly (consider functional transforms instead)",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "collect-turbofish",
+            "pattern": "\\.collect\\(\\)",
+            "title": "Type Inference with collect()",
+            "rustTerm": "collect::<T>() turbofish",
+            "officialDoc": "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.collect",
+            "explanation": "Rust needs to know what type to collect into. Use turbofish `::<Vec<_>>` or type annotation.",
+            "example": "let v: Vec<_> = iter.collect();\n// or\nlet v = iter.collect::<Vec<_>>();",
+            "suggestedFix": {
+                "description": "Add turbofish type annotation",
+                "before": ".collect()",
+                "after": ".collect::<Vec<_>>()"
+            },
+            "deepExplanation": "## The Turbofish `::<>`\n\n`.collect()` can create many different collection types, so Rust needs help knowing which one.\n\n### Options\n```rust\n// Type annotation (preferred for readability)\nlet nums: Vec<i32> = (0..10).collect();\n\n// Turbofish (inline, good for chaining)\nlet nums = (0..10).collect::<Vec<i32>>();\n\n// Partial inference with _\nlet nums: Vec<_> = (0..10).collect();\n```\n\n### Common collect targets\n- `Vec<T>` - Dynamic array\n- `HashSet<T>` - Unique items\n- `HashMap<K, V>` - Key-value pairs\n- `String` - From char iterator\n- `Result<Vec<T>, E>` - Collect with error handling",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "map-filter-fold",
+            "pattern": "\\.map\\(|\\.filter\\(|\\.fold\\(",
+            "title": "Functional Transforms",
+            "rustTerm": "map, filter, fold",
+            "officialDoc": "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.map",
+            "explanation": "These transform iterators without mutation. `.map()` transforms each item, `.filter()` keeps matching items, `.fold()` accumulates into a single value.",
+            "example": "let doubled: Vec<_> = nums.iter()\n    .filter(|n| **n > 0)\n    .map(|n| n * 2)\n    .collect();",
+            "deepExplanation": "## Iterator Transformations\n\n### `.map()` - Transform Each Item\n```rust\nlet nums = vec![1, 2, 3];\nlet doubled: Vec<_> = nums.iter()\n    .map(|n| n * 2)\n    .collect();\n// [2, 4, 6]\n```\n\n### `.filter()` - Keep Matching Items\n```rust\nlet nums = vec![1, 2, 3, 4, 5];\nlet evens: Vec<_> = nums.iter()\n    .filter(|n| *n % 2 == 0)\n    .collect();\n// [2, 4]\n```\n\n### `.fold()` - Accumulate into Single Value\n```rust\nlet nums = vec![1, 2, 3, 4];\nlet sum = nums.iter()\n    .fold(0, |acc, n| acc + n);\n// 10\n```\n\n### Chaining\n```rust\nlet result: i32 = data.iter()\n    .filter(|x| x.is_valid())\n    .map(|x| x.value)\n    .fold(0, |sum, v| sum + v);\n```\n\n### Lazy Evaluation\nIterators are lazy - no work happens until you consume:\n```rust\nlet iter = (0..1000000)\n    .map(|n| n * 2)    // No work yet\n    .filter(|n| n > 100);  // Still no work\n\nlet first = iter.next();  // Now it evaluates\n```",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "for-each-vs-for",
+            "pattern": "\\.for_each\\(",
+            "title": "for_each vs for Loop",
+            "rustTerm": "Iterator::for_each()",
+            "officialDoc": "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.for_each",
+            "explanation": "Equivalent to using a `for` loop, but `break` and `continue` are not possible from a closure. Generally more idiomatic to use a `for` loop, but `for_each` may be more legible at the end of longer iterator chains.",
+            "example": "// Prefer for loop (more idiomatic):\nfor item in items.iter() {\n    println!(\"{}\", item);\n}\n\n// for_each is legible at end of chains:\nitems.iter().filter(|x| x.valid).for_each(process);",
+            "deepExplanation": "## for_each vs for Loop\n\n> From [official Rust docs](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.for_each):\n> \"This is equivalent to using a `for` loop on the iterator, although `break` and `continue` are not possible from a closure. It's generally more idiomatic to use a `for` loop, but `for_each` may be more legible when processing items at the end of longer iterator chains. In some cases `for_each` may also be faster than a loop, because it will use internal iteration on adapters like `Chain`.\"\n\n### When to Use for Loop (Default)\n```rust\n// Clear, idiomatic, supports control flow\nfor token in tokens.iter() {\n    if token.is_end() {\n        break;     // ✓ Works\n    }\n    if token.skip {\n        continue;  // ✓ Works\n    }\n    process(token);\n}\n```\n\n### When for_each Makes Sense\n```rust\n// At the end of a longer iterator chain\nitems.iter()\n    .filter(|x| x.is_valid())\n    .map(|x| x.transform())\n    .for_each(|x| process(x));\n\n// May be faster with Chain adapter\nlet a = vec![1, 2];\nlet b = vec![3, 4];\na.iter().chain(b.iter()).for_each(|n| println!(\"{}\", n));\n```\n\n### Key Differences\n| Feature | `for` loop | `.for_each()` |\n|---------|------------|---------------|\n| `break` | ✓ Yes | ✗ No |\n| `continue` | ✓ Yes | ✗ No |\n| `return` from fn | ✓ Yes | ✗ Only exits closure |\n| Idiomatic | ✓ Preferred | Good in chains |\n| Performance | Same | May be faster with `Chain` |\n\n### Warning: return in for_each\n```rust\n// This doesn't do what you might think!\nitems.iter().for_each(|x| {\n    if x.is_bad() {\n        return;  // Only exits closure, NOT the function!\n    }\n    process(x);\n});\n```\n\n### Control Flow Alternatives\nIf you need `break` or `continue` with an iterator chain, consider:\n```rust\n// Use try_for_each with Result/Option\nitems.iter().try_for_each(|x| {\n    if x.is_bad() {\n        return None;  // \"breaks\" the iteration\n    }\n    Some(process(x))\n});\n\n// Or convert chain to for loop\nfor item in items.iter().filter(|x| x.valid) {\n    if done { break; }\n    process(item);\n}\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general"
+            ],
+            "suggestedFix": {
+                "description": "Use try_for_each for early exit",
+                "before": ".for_each(",
+                "after": ".try_for_each("
+            }
+        },
+        {
+            "id": "for-in-loop",
+            "pattern": "for\\s+\\w+\\s+in\\s+",
+            "title": "For Loop Iteration",
+            "rustTerm": "for-in loop",
+            "explanation": "The `for` loop is the most common way to iterate in Rust. It automatically calls `.into_iter()` on the value after `in`.",
+            "example": "for item in &items { ... }     // Borrows\nfor item in &mut items { ... } // Mutable borrow\nfor item in items { ... }      // Takes ownership",
+            "deepExplanation": "## For Loops in Rust\n\n### Basic Iteration\n```rust\nlet nums = vec![1, 2, 3];\n\n// Borrow with &\nfor n in &nums {\n    println!(\"{}\", n);  // n is &i32\n}\n// nums still valid here\n\n// Mutable borrow with &mut\nfor n in &mut nums {\n    *n += 1;  // n is &mut i32\n}\n\n// Consume (move)\nfor n in nums {\n    println!(\"{}\", n);  // n is i32\n}\n// nums is gone!\n```\n\n### What for Actually Does\n```rust\n// This:\nfor item in collection { ... }\n\n// Is sugar for:\nlet mut iter = collection.into_iter();\nwhile let Some(item) = iter.next() {\n    ...\n}\n```\n\n### Iterating Ranges\n```rust\nfor i in 0..10 { ... }      // 0 to 9\nfor i in 0..=10 { ... }     // 0 to 10 (inclusive)\nfor i in (0..10).rev() { }  // 9 to 0\n```\n\n### With Pattern Destructuring\n```rust\nlet pairs = vec![(1, 'a'), (2, 'b')];\n\nfor (num, letter) in pairs {\n    println!(\"{}: {}\", num, letter);\n}\n```\n\n### Common Patterns\n```rust\n// With index\nfor (i, item) in items.iter().enumerate() { ... }\n\n// Skip/take\nfor item in items.iter().skip(1).take(5) { ... }\n\n// Filtered\nfor item in items.iter().filter(|x| x.valid) { ... }\n```",
+            "confidence": 0.3,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "loop-keyword",
+            "pattern": "loop\\s*\\{",
+            "title": "Infinite Loop",
+            "rustTerm": "loop",
+            "explanation": "`loop` creates an infinite loop. Use `break` to exit, optionally with a value. Clearer than `while true`.",
+            "example": "let result = loop {\n    if let Some(val) = try_get() {\n        break val;  // Exit with value\n    }\n};",
+            "deepExplanation": "## The loop Keyword\n\n### Basic Infinite Loop\n```rust\nloop {\n    // Runs forever until break\n    if done {\n        break;\n    }\n}\n```\n\n### loop Returns a Value\n```rust\nlet result = loop {\n    let attempt = try_something();\n    if attempt.is_ok() {\n        break attempt.unwrap();  // Return value from loop\n    }\n};\n```\n\n### Why loop Instead of while true\n```rust\n// Compiler knows this never exits normally\nloop {\n    break 42;\n}\n\n// Compiler can't prove this always breaks\nwhile true {\n    break 42;  // Warning: might not break\n}\n```\n\n### Common Patterns\n\n**Retry loop:**\n```rust\nlet data = loop {\n    match fetch_data() {\n        Ok(d) => break d,\n        Err(_) => {\n            std::thread::sleep(Duration::from_secs(1));\n            continue;\n        }\n    }\n};\n```\n\n**Event loop:**\n```rust\nloop {\n    match event_source.next_event() {\n        Event::Quit => break,\n        Event::Input(i) => handle_input(i),\n        Event::Tick => update(),\n    }\n}\n```\n\n**With labels for nested loops:**\n```rust\n'outer: loop {\n    'inner: loop {\n        if condition {\n            break 'outer;  // Breaks outer loop\n        }\n    }\n}\n```",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "flat-map",
+            "pattern": "\\.flat_map\\(",
+            "title": "Flattening Nested Iterators",
+            "rustTerm": "flat_map",
+            "explanation": "`.flat_map()` maps and flattens in one step. Use when each item expands to multiple items.",
+            "example": "let words = vec![\"hello world\", \"foo bar\"];\nlet chars: Vec<_> = words.iter()\n    .flat_map(|s| s.chars())\n    .collect();",
+            "deepExplanation": "## Flattening with flat_map\n\n### The Problem\n```rust\nlet nested = vec![vec![1, 2], vec![3, 4]];\n\n// map gives us nested iterators\nlet mapped = nested.iter().map(|v| v.iter());\n// Iterator<Item = Iterator<Item = &i32>>  - nested!\n```\n\n### The Solution\n```rust\n// flat_map flattens automatically\nlet flat: Vec<_> = nested.iter()\n    .flat_map(|v| v.iter())\n    .collect();\n// [1, 2, 3, 4]\n```\n\n### Common Use Cases\n\n**Splitting strings:**\n```rust\nlet text = \"line1\\nline2\\nline3\";\nlet words: Vec<_> = text.lines()\n    .flat_map(|line| line.split_whitespace())\n    .collect();\n```\n\n**Expanding options:**\n```rust\nlet opts = vec![Some(1), None, Some(3)];\nlet values: Vec<_> = opts.into_iter()\n    .flat_map(|o| o)  // or .flatten()\n    .collect();\n// [1, 3]\n```\n\n### flat_map vs map + flatten\n```rust\n// These are equivalent:\niter.flat_map(|x| f(x))\niter.map(|x| f(x)).flatten()\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general",
+                "parser"
+            ]
+        },
+        {
+            "id": "enumerate",
+            "pattern": "\\.enumerate\\(",
+            "title": "Iterating with Index",
+            "rustTerm": "enumerate",
+            "officialDoc": "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.enumerate",
+            "explanation": "`.enumerate()` gives you `(index, item)` pairs. Use when you need both the position and value - common for line numbers, array indices, or sequential processing.",
+            "example": "for (i, line) in lines.iter().enumerate() {\n    println!(\"Line {}: {}\", i + 1, line);\n}",
+            "deepExplanation": "## When and Why to Use enumerate\n\n### The Problem It Solves\nYou need to know **where** each item is, not just **what** it is:\n\n```rust\n// Without enumerate - manual index tracking (error-prone)\nlet mut i = 0;\nfor line in lines {\n    println!(\"Line {}: {}\", i, line);\n    i += 1;  // Easy to forget!\n}\n\n// With enumerate - index is automatic\nfor (i, line) in lines.iter().enumerate() {\n    println!(\"Line {}: {}\", i, line);\n}\n```\n\n### Common Use Cases\n\n**1. Line/Row Numbers (Parsers, File Processing)**\n```rust\nfor (line_no, line) in file_lines.enumerate() {\n    if line.contains(\"ERROR\") {\n        eprintln!(\"Error on line {}: {}\", line_no + 1, line);\n    }\n}\n```\n\n**2. Building Indexed Data Structures**\n```rust\nlet indexed: Vec<_> = items.iter()\n    .enumerate()\n    .map(|(i, item)| (i, item.clone()))\n    .collect();\n```\n\n**3. Comparing with Other Arrays**\n```rust\nfor (i, (expected, actual)) in expected.iter().zip(actual.iter()).enumerate() {\n    if expected != actual {\n        eprintln!(\"Mismatch at index {}: {} != {}\", i, expected, actual);\n    }\n}\n```\n\n**4. Conditional Logic Based on Position**\n```rust\nfor (i, item) in items.iter().enumerate() {\n    if i == 0 {\n        // Special handling for first item\n    } else if i == items.len() - 1 {\n        // Special handling for last item\n    }\n    process(item);\n}\n```\n\n### When NOT to Use enumerate\n\n**If you only need the index:**\n```rust\n// Don't do this:\nfor (i, _) in items.iter().enumerate() {\n    println!(\"{}\", i);\n}\n\n// Just use a range:\nfor i in 0..items.len() {\n    println!(\"{}\", i);\n}\n```\n\n**If you want to FIND the index of something:**\n```rust\n// Don't do this:\nlet mut result = None;\nfor (i, item) in items.iter().enumerate() {\n    if item == target {\n        result = Some(i);\n        break;\n    }\n}\n\n// Use .position() instead:\nlet result = items.iter().position(|item| item == target);\n```\n\n### Alternatives Comparison\n\n| Method | Returns | Use When |\n|--------|---------|----------|\n| `.enumerate()` | `(index, &item)` | Need both index and item |\n| `.position(pred)` | `Option<usize>` | Just find index of match |\n| `for i in 0..len` | `usize` | Only need indices |\n| `.zip(0..)` | `(&item, usize)` | Same as enumerate (less common) |\n\n### Functional Style\n```rust\n// Filter with index awareness\nlet odd_positioned: Vec<_> = items.iter()\n    .enumerate()\n    .filter(|(i, _)| i % 2 == 1)  // Keep odd indices\n    .map(|(_, item)| item)\n    .collect();\n\n// Find first index where condition holds\nlet first_match = items.iter()\n    .enumerate()\n    .find(|(_, item)| item.is_valid())\n    .map(|(i, _)| i);\n// Or simpler: items.iter().position(|item| item.is_valid())\n```\n\n### Real-World Example: HTTP Server\n```rust\n// Processing HTTP headers - need line numbers for errors\nfor (line_no, line) in request_lines.iter().enumerate() {\n    if line_no == 0 {\n        // Parse request line: \"GET /path HTTP/1.1\"\n        parse_request_line(line)?;\n    } else if line.is_empty() {\n        // Empty line marks end of headers\n        break;\n    } else {\n        // Parse header: \"Content-Type: text/html\"\n        parse_header(line)\n            .with_context(|| format!(\"Invalid header on line {}\", line_no + 1))?;\n    }\n}\n```\n\n### Key Takeaway\n**Use `.enumerate()` when the position matters for your logic** - error messages, conditional behavior, or building indexed data. Otherwise, consider `.position()` for finding indices, or plain iteration if you don't need indices at all.",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "zip-iterator",
+            "pattern": "\\.zip\\(",
+            "title": "Pairing Iterators",
+            "rustTerm": "zip",
+            "explanation": "`.zip()` pairs up two iterators element by element. Stops when either iterator is exhausted.",
+            "example": "let names = vec![\"Alice\", \"Bob\"];\nlet scores = vec![95, 87];\n\nfor (name, score) in names.iter().zip(scores.iter()) {\n    println!(\"{}: {}\", name, score);\n}",
+            "deepExplanation": "## Zipping Iterators\n\n### Basic Usage\n```rust\nlet a = [1, 2, 3];\nlet b = ['a', 'b', 'c'];\n\nlet zipped: Vec<_> = a.iter().zip(b.iter()).collect();\n// [(1, 'a'), (2, 'b'), (3, 'c')]\n```\n\n### Unequal Lengths\n```rust\nlet short = [1, 2];\nlet long = [10, 20, 30, 40];\n\nlet zipped: Vec<_> = short.iter().zip(long.iter()).collect();\n// [(1, 10), (2, 20)]  -- stops at shorter\n```\n\n### Common Patterns\n\n**Comparing two lists:**\n```rust\nlet matches = a.iter().zip(b.iter())\n    .all(|(x, y)| x == y);\n```\n\n**Processing pairs:**\n```rust\nlet keys = vec![\"name\", \"age\"];\nlet values = vec![\"Alice\", \"30\"];\n\nlet map: HashMap<_, _> = keys.into_iter()\n    .zip(values.into_iter())\n    .collect();\n```\n\n**With enumerate:**\n```rust\nfor (i, (a, b)) in xs.iter().zip(ys.iter()).enumerate() {\n    println!(\"{}:  {} vs {}\", i, a, b);\n}\n```",
+            "confidence": 0.5,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "take-skip",
+            "pattern": "\\.take\\(|\\.skip\\(|\\.take_while\\(|\\.skip_while\\(",
+            "title": "Limiting Iterators",
+            "rustTerm": "take and skip",
+            "explanation": "`.take(n)` takes first n items. `.skip(n)` skips first n items. The `_while` variants use predicates.",
+            "example": "// First 5 items\nlet first_five: Vec<_> = iter.take(5).collect();\n\n// Skip header, take until blank\nlet body: Vec<_> = lines\n    .skip(1)\n    .take_while(|l| !l.is_empty())\n    .collect();",
+            "deepExplanation": "## Limiting Iterators\n\n### `.take(n)` - First N Items\n```rust\nlet nums = 1..100;\nlet first_five: Vec<_> = nums.take(5).collect();\n// [1, 2, 3, 4, 5]\n```\n\n### `.skip(n)` - Skip First N\n```rust\nlet nums = vec![1, 2, 3, 4, 5];\nlet last_three: Vec<_> = nums.iter().skip(2).collect();\n// [3, 4, 5]\n```\n\n### `.take_while(predicate)` - Take While True\n```rust\nlet nums = vec![2, 4, 6, 7, 8, 10];\nlet evens: Vec<_> = nums.iter()\n    .take_while(|n| *n % 2 == 0)\n    .collect();\n// [2, 4, 6]  -- stops at 7\n```\n\n### `.skip_while(predicate)` - Skip While True\n```rust\nlet nums = vec![1, 2, 10, 20, 3, 4];\nlet after_big: Vec<_> = nums.iter()\n    .skip_while(|n| **n < 10)\n    .collect();\n// [10, 20, 3, 4]\n```\n\n### Combining\n```rust\n// Get items 10-20\nlet page: Vec<_> = items.iter()\n    .skip(10)\n    .take(10)\n    .collect();\n```",
+            "confidence": 0.5,
+            "contexts": [
+                "general",
+                "parser"
+            ]
+        },
+        {
+            "id": "find-any-all",
+            "pattern": "\\.find\\(|\\.any\\(|\\.all\\(",
+            "title": "Searching Iterators",
+            "rustTerm": "find, any, all",
+            "explanation": "`.find()` returns first match. `.any()` checks if any match. `.all()` checks if all match. All short-circuit.",
+            "example": "let has_negative = nums.iter().any(|n| *n < 0);\nlet all_positive = nums.iter().all(|n| *n > 0);\nlet first_big = nums.iter().find(|n| **n > 100);",
+            "deepExplanation": "## Searching Iterators\n\n### `.find(predicate)` - First Match\n```rust\nlet nums = vec![1, 2, 3, 4, 5];\nlet first_even = nums.iter().find(|n| *n % 2 == 0);\n// Some(&2)\n```\n\n### `.any(predicate)` - Any Match?\n```rust\nlet has_negative = nums.iter().any(|n| *n < 0);\n// false\n```\n\n### `.all(predicate)` - All Match?\n```rust\nlet all_positive = nums.iter().all(|n| *n > 0);\n// true\n```\n\n### Short-Circuiting\nAll these stop as soon as they have an answer:\n```rust\n// Stops at first match\nlet found = (0..1000000).find(|n| *n == 42);\n\n// Stops at first failure\nlet valid = items.iter().all(|i| i.is_valid());\n```\n\n### Related Methods\n```rust\n// Position of first match\nlet index = items.iter().position(|x| x == target);\n\n// Count matches\nlet count = items.iter().filter(|x| x.is_valid()).count();\n```",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        },
+        {
+            "id": "while-let",
+            "pattern": "while\\s+let\\s+Some",
+            "title": "While Let Pattern",
+            "rustTerm": "while let",
+            "explanation": "`while let` loops while a pattern matches. Perfect for consuming iterators or processing until None.",
+            "example": "let mut iter = items.iter();\nwhile let Some(item) = iter.next() {\n    process(item);\n}",
+            "deepExplanation": "## While Let Loops\n\n### Basic Pattern\n```rust\nlet mut stack = vec![1, 2, 3];\n\nwhile let Some(top) = stack.pop() {\n    println!(\"{}\", top);\n}\n// 3, 2, 1\n```\n\n### With Iterators\n```rust\nlet mut chars = \"hello\".chars();\n\nwhile let Some(c) = chars.next() {\n    if c == 'l' {\n        break;  // Can use break/continue\n    }\n    println!(\"{}\", c);\n}\n```\n\n### Channels and Receivers\n```rust\nwhile let Ok(msg) = receiver.recv() {\n    handle(msg);\n}\n```\n\n### vs For Loop\n```rust\n// For loop - cleaner when you don't need control\nfor item in items {\n    process(item);\n}\n\n// While let - when you need break/continue or complex logic\nwhile let Some(item) = iter.next() {\n    if should_skip(&item) { continue; }\n    if should_stop(&item) { break; }\n    process(item);\n}\n```\n\n### Multiple Patterns\n```rust\nwhile let Some(Ok(line)) = reader.next() {\n    // Stops on None OR on Err\n    process(line);\n}\n```",
+            "confidence": 0.6,
+            "contexts": [
+                "general",
+                "parser"
+            ]
+        },
+        {
+            "id": "if-let",
+            "pattern": "if\\s+let\\s+Some|if\\s+let\\s+Ok",
+            "title": "If Let Pattern",
+            "rustTerm": "if let",
+            "explanation": "`if let` is a concise way to match one pattern. Cleaner than `match` when you only care about one case.",
+            "example": "// Instead of match with _ arm:\nif let Some(value) = optional {\n    use_value(value);\n}",
+            "deepExplanation": "## If Let Expressions\n\n### Basic Usage\n```rust\nlet opt = Some(42);\n\n// Match is verbose for one case\nmatch opt {\n    Some(n) => println!(\"{}\", n),\n    None => {},\n}\n\n// If let is cleaner\nif let Some(n) = opt {\n    println!(\"{}\", n);\n}\n```\n\n### With Else\n```rust\nif let Some(n) = opt {\n    println!(\"Got: {}\", n);\n} else {\n    println!(\"Nothing\");\n}\n```\n\n### Chained If Let (let-else coming)\n```rust\nif let Some(a) = opt_a {\n    if let Some(b) = opt_b {\n        use_both(a, b);\n    }\n}\n```\n\n### With Result\n```rust\nif let Ok(file) = File::open(path) {\n    read(file);\n} else {\n    eprintln!(\"Could not open file\");\n}\n```\n\n### When to Use\n| Situation | Use |\n|-----------|-----|\n| One pattern to match | `if let` |\n| Multiple patterns | `match` |\n| Need else with pattern | `match` |\n| Just check & use | `if let` |",
+            "confidence": 0.4,
+            "contexts": [
+                "general"
+            ]
+        }
+    ]
+}

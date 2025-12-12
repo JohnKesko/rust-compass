@@ -1,0 +1,14 @@
+.github
+.vscode-test/
+
+*.vsix
+bun.lock
+
+out
+dist
+node_modules
+
+test-workspace/target
+test-workspace/Cargo.lock
+
+img/*.mov
