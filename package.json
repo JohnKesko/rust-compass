@@ -1,6 +1,6 @@
 {
   "name": "rust-compass",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "displayName": "Rust Compass",
   "description": "A contextual Rust learning companion that provides hints, explanations, and guidance while coding",
   "publisher": "JohnK",
