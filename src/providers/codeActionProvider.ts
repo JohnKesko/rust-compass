@@ -32,7 +32,7 @@ export class RustCodeActionProvider implements vscode.CodeActionProvider {
 
         const fix = match.rule.suggestedFix;
 
-        // Create the code action
+        // Create action
         const action = new vscode.CodeAction(
             `Rust Compass: ${fix.description}`,
             vscode.CodeActionKind.QuickFix
