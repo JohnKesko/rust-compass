@@ -2,7 +2,7 @@
   "name": "rust-compass",
   "displayName": "Rust Compass",
   "description": "A contextual Rust learning companion that provides hints, explanations, and guidance while coding",
-  "version": "0.0.3",
+  "version": "0.0.1",
   "publisher": "JohnK",
   "preview": true,
   "icon": "img/icon-experimental.png",
