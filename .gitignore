@@ -10,3 +10,4 @@ test-workspace/target
 test-workspace/Cargo.lock
 
 img/*.mov
+INFO.txt
