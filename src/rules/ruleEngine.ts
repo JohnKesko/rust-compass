@@ -7,6 +7,9 @@ export class RuleEngine {
     private rules: Rule[] = [];
     private compiledPatterns: Map<string, RegExp> = new Map();
 
+    // Cache matches per document version to avoid re-scanning
+    private matchCache: Map<string, { version: number; context: ProjectContext; matches: RuleMatch[] }> = new Map();
+
     constructor(private extensionPath: string) {
         this.loadRules();
     }
@@ -46,6 +49,13 @@ export class RuleEngine {
     }
 
     public findMatches(document: vscode.TextDocument, context: ProjectContext): RuleMatch[] {
+        // Check cache first
+        const cacheKey = document.uri.toString();
+        const cached = this.matchCache.get(cacheKey);
+        if (cached && cached.version === document.version && cached.context === context) {
+            return cached.matches;
+        }
+
         const matches: RuleMatch[] = [];
         const text = document.getText();
 
@@ -77,6 +87,15 @@ export class RuleEngine {
             }
         }
 
+        // Cache the results
+        this.matchCache.set(cacheKey, { version: document.version, context, matches });
+
+        // Limit cache size (keep last 10 documents)
+        if (this.matchCache.size > 10) {
+            const firstKey = this.matchCache.keys().next().value;
+            if (firstKey) { this.matchCache.delete(firstKey); }
+        }
+
         return matches;
     }
 
@@ -102,6 +121,7 @@ export class RuleEngine {
     public reloadRules(): void {
         this.rules = [];
         this.compiledPatterns.clear();
+        this.matchCache.clear();
         this.loadRules();
     }
 }

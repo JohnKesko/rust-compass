@@ -23,7 +23,6 @@ Rust Compass answers these questions right in your editor, pulling explanations 
 **Hover Hints** — Hover over detected patterns for a quick explanation and link to details.
 
 ![Hover hint](img/hover.png)
-<!-- Screenshot: Hovering over .unwrap() showing the hint popup -->
 
 **Learn Panel** — Click "Learn more" to open a sidebar with:
 - Beginner-friendly explanation (simplified via Copilot)
@@ -33,20 +32,10 @@ Rust Compass answers these questions right in your editor, pulling explanations 
 > *Note: The beginner-friendly explanation requires GitHub Copilot for simplification. Without it, you'll still get the official documentation.*
 
 ![Learn panel](img/learn-panel.png)
-<!-- Screenshot: The Learn panel showing the two-tab view with beginner explanation and alternatives table -->
 
-**Code Actions** — Quick fixes via the lightbulb menu when improvements are available.
+**Bulb** — Quick fixes via the lightbulb menu when improvements are available.
 
-![Code action](img/code-action.png)
-<!-- Screenshot: Lightbulb menu showing "Consider using .peekable()" suggestion -->
-
-## Installation
-
-Search for "Rust Compass" in the VS Code extensions marketplace, or:
-
-```
-ext install rust-compass
-```
+![Bulb](img/bulb.png)
 
 ## Settings
 

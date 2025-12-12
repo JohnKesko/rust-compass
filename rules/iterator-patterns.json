@@ -207,6 +207,56 @@
             "contexts": [
                 "general"
             ]
+        },
+        {
+            "id": "peekable-iterator",
+            "pattern": "\\.peekable\\(\\)",
+            "title": "Peekable Iterator",
+            "rustTerm": "Iterator::peekable()",
+            "officialDoc": "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.peekable",
+            "explanation": "`.peekable()` wraps an iterator to allow looking ahead with `.peek()` without consuming the next item. Essential for parsers and lexers.",
+            "example": "let mut chars = \"hello\".chars().peekable();\nwhile let Some(&c) = chars.peek() {\n    if c.is_alphabetic() {\n        chars.next(); // consume it\n    } else {\n        break;\n    }\n}",
+            "deepExplanation": "## Peekable Iterators\n\n### The Problem\nRegular iterators only move forward. Once you call `.next()`, the item is gone.\n\n```rust\nlet mut chars = \"abc\".chars();\nlet c = chars.next(); // 'a' is consumed forever\n```\n\n### The Solution\n`.peekable()` lets you look at the next item without consuming it:\n\n```rust\nlet mut chars = \"abc\".chars().peekable();\n\n// Look without consuming\nif let Some(&c) = chars.peek() {\n    println!(\"Next is: {}\", c); // 'a'\n}\n\n// Still there!\nlet c = chars.next(); // Now consume 'a'\n```\n\n### Common Use Cases\n\n**Lexer - Peek to decide token type:**\n```rust\nlet mut chars = input.chars().peekable();\n\nwhile let Some(&c) = chars.peek() {\n    match c {\n        '0'..='9' => tokens.push(read_number(&mut chars)),\n        'a'..='z' => tokens.push(read_identifier(&mut chars)),\n        _ => { chars.next(); } // skip\n    }\n}\n```\n\n**Conditional consumption:**\n```rust\n// Only consume if it matches\nif chars.peek() == Some(&'=') {\n    chars.next();\n    return Token::Equals;\n}\n```\n\n### Methods on Peekable\n- `.peek()` - Look at next item (`Option<&T>`)\n- `.peek_mut()` - Look and modify next item\n- `.next_if(|x| condition)` - Consume only if predicate matches\n- `.next_if_eq(&value)` - Consume only if equals value",
+            "confidence": 0.8,
+            "contexts": [
+                "parser",
+                "general"
+            ]
+        },
+        {
+            "id": "peek-method",
+            "pattern": "\\.peek\\(\\)",
+            "title": "Peeking Ahead",
+            "rustTerm": "Peekable::peek()",
+            "officialDoc": "https://doc.rust-lang.org/std/iter/struct.Peekable.html#method.peek",
+            "explanation": "`.peek()` returns a reference to the next item without consuming it. The iterator must be wrapped in `.peekable()` first.",
+            "example": "let mut iter = [1, 2, 3].iter().peekable();\nassert_eq!(iter.peek(), Some(&&1));\nassert_eq!(iter.next(), Some(&1)); // Still there!",
+            "deepExplanation": "## The peek() Method\n\n### Basic Usage\n```rust\nlet mut chars = \"hello\".chars().peekable();\n\n// peek() returns Option<&T>\nif let Some(&c) = chars.peek() {\n    println!(\"Next char is: {}\", c);\n}\n\n// The item is still there\nassert_eq!(chars.next(), Some('h'));\n```\n\n### Why the Double Reference?\n```rust\nlet mut nums = vec![1, 2, 3].iter().peekable();\n\n// nums.next() returns Option<&i32>\n// nums.peek() returns Option<&&i32> (reference to the reference)\n\nif let Some(&&n) = nums.peek() {\n    println!(\"{}\", n);\n}\n// Or dereference:\nif let Some(n) = nums.peek() {\n    println!(\"{}\", **n);\n}\n```\n\n### Related Methods\n```rust\nlet mut chars = \"abc\".chars().peekable();\n\n// peek_mut - modify before consuming\nif let Some(c) = chars.peek_mut() {\n    *c = c.to_ascii_uppercase();\n}\n\n// next_if - conditional consume\nlet digit = chars.next_if(|c| c.is_ascii_digit());\n\n// next_if_eq - consume if equals\nlet a = chars.next_if_eq(&'a');\n```",
+            "confidence": 0.7,
+            "contexts": [
+                "parser",
+                "general"
+            ]
+        },
+        {
+            "id": "next-if",
+            "pattern": "\\.next_if\\(|\\.next_if_eq\\(",
+            "title": "Conditional Consumption",
+            "rustTerm": "Peekable::next_if()",
+            "officialDoc": "https://doc.rust-lang.org/std/iter/struct.Peekable.html#method.next_if",
+            "explanation": "`.next_if()` consumes the next item only if it matches a predicate. Cleaner than peek + conditional next.",
+            "example": "let mut chars = \"abc123\".chars().peekable();\n// Consume only if it's a digit\nwhile let Some(d) = chars.next_if(|c| c.is_ascii_digit()) {\n    digits.push(d);\n}",
+            "deepExplanation": "## Conditional Iterator Consumption\n\n### The Old Way\n```rust\nlet mut chars = input.chars().peekable();\n\n// Verbose: peek then conditionally consume\nwhile let Some(&c) = chars.peek() {\n    if c.is_ascii_digit() {\n        chars.next();\n        digits.push(c);\n    } else {\n        break;\n    }\n}\n```\n\n### With next_if()\n```rust\n// Clean: consume only if matches\nwhile let Some(c) = chars.next_if(|c| c.is_ascii_digit()) {\n    digits.push(c);\n}\n```\n\n### next_if_eq() for Exact Matches\n```rust\nlet mut chars = \"===\".chars().peekable();\n\n// Consume if equals specific value\nif chars.next_if_eq(&'=').is_some() {\n    if chars.next_if_eq(&'=').is_some() {\n        return Token::DoubleEquals;\n    }\n    return Token::Equals;\n}\n```\n\n### Return Value\n- Returns `Some(item)` if consumed\n- Returns `None` if predicate failed (item not consumed)\n\n```rust\nlet eaten = chars.next_if(|c| *c == 'x');\nmatch eaten {\n    Some(c) => println!(\"Consumed: {}\", c),\n    None => println!(\"Didn't match, still in iterator\"),\n}\n```",
+            "confidence": 0.7,
+            "contexts": [
+                "parser",
+                "general"
+            ],
+            "suggestedFix": {
+                "description": "Use next_if_eq for exact value match",
+                "before": ".next_if(",
+                "after": ".next_if_eq(&"
+            }
         }
     ]
 }

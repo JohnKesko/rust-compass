@@ -21,7 +21,7 @@ fn main() {
         },
     ];
 
-    for (i, token) in tk.iter().enumerate() {
+    for (i, token) in tk.iter().enumerate().peekable() {
         println!(
             "Token {}: length = {}, data = {}",
             i, token.length, token.data
