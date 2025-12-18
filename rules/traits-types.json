@@ -1,135 +1,211 @@
 {
-    "category": "Traits and Types",
-    "rules": [
-        {
-            "id": "impl-trait",
-            "pattern": "impl\\s+\\w+\\s*\\{|impl\\s+\\w+\\s+for",
-            "title": "Implementing Traits",
-            "rustTerm": "impl blocks",
-            "explanation": "Use `impl` to add methods to types or implement traits. `impl Trait for Type` implements a trait.",
-            "example": "impl Display for MyType {\n    fn fmt(&self, f: &mut Formatter) -> fmt::Result {\n        write!(f, \"...\")\n    }\n}",
-            "deepExplanation": "## impl Blocks\n\n### Inherent Implementation\n```rust\nstruct Counter {\n    value: u32,\n}\n\nimpl Counter {\n    // Associated function (no self)\n    fn new() -> Self {\n        Counter { value: 0 }\n    }\n    \n    // Method (has self)\n    fn increment(&mut self) {\n        self.value += 1;\n    }\n    \n    fn get(&self) -> u32 {\n        self.value\n    }\n}\n```\n\n### Trait Implementation\n```rust\nimpl Display for Counter {\n    fn fmt(&self, f: &mut Formatter) -> fmt::Result {\n        write!(f, \"Counter({})\", self.value)\n    }\n}\n```\n\n### self Variants\n| Signature | Meaning |\n|-----------|--------|\n| `&self` | Borrow immutably |\n| `&mut self` | Borrow mutably |\n| `self` | Take ownership |\n| `Self` | The implementing type |\n\n### Multiple impl Blocks\n```rust\n// You can have multiple impl blocks\nimpl Counter {\n    fn new() -> Self { ... }\n}\n\nimpl Counter {\n    fn increment(&mut self) { ... }\n}\n```",
-            "confidence": 0.4,
-            "contexts": [
-                "general"
-            ]
-        },
-        {
-            "id": "derive-macro",
-            "pattern": "#\\[derive\\(",
-            "title": "Derive Macro",
-            "rustTerm": "#[derive(...)]",
-            "explanation": "Derive automatically implements common traits. Most types should derive Debug at minimum.",
-            "example": "#[derive(Debug, Clone, PartialEq)]\nstruct Point { x: i32, y: i32 }",
-            "deepExplanation": "## Derive Macro\n\nAutomatically implement common traits.\n\n### Common Derives\n```rust\n#[derive(\n    Debug,      // {:?} formatting\n    Clone,      // .clone() method\n    Copy,       // Implicit copy (small types only)\n    PartialEq,  // == comparison\n    Eq,         // Total equality (requires PartialEq)\n    Hash,       // Can be HashMap key (requires Eq)\n    Default,    // Default::default()\n    PartialOrd, // <, >, <=, >= comparison\n    Ord,        // Total ordering (requires PartialOrd + Eq)\n)]\nstruct Point { x: i32, y: i32 }\n```\n\n### When to Derive What\n| Trait | When to use |\n|-------|------------|\n| `Debug` | Almost always - enables println!(\"{:?}\", x) |\n| `Clone` | When you need to duplicate values |\n| `Copy` | Small, stack-only types (like i32, bool) |\n| `PartialEq` | When you need == comparisons |\n| `Hash` | When using as HashMap/HashSet key |\n| `Default` | When there's a sensible default |\n\n### Derive Requirements\n```rust\n// All fields must implement the trait\n#[derive(Clone)]\nstruct Container {\n    data: Vec<u8>,  // Vec implements Clone ✓\n    id: u32,        // u32 implements Clone ✓\n}\n```\n\n### Serde for Serialization\n```rust\n#[derive(Serialize, Deserialize)]\nstruct Config {\n    name: String,\n    count: u32,\n}\n```",
-            "confidence": 0.5,
-            "contexts": [
-                "general"
-            ]
-        },
-        {
-            "id": "from-into-trait",
-            "pattern": "impl\\s+From<|impl\\s+Into<|\\.into\\(\\)|\\.from\\(",
-            "title": "From/Into Conversions",
-            "rustTerm": "From and Into traits",
-            "explanation": "From/Into provide type conversions. Implement From and you get Into for free. Use `.into()` for ergonomic conversions.",
-            "example": "let s: String = \"hello\".into();\n// Same as: String::from(\"hello\")",
-            "deepExplanation": "## From and Into Traits\n\n### The Relationship\n- Implement `From<T>` to get `Into<T>` automatically\n- Always implement `From`, never `Into` directly\n\n### Implementing From\n```rust\nstruct Meters(f64);\nstruct Feet(f64);\n\nimpl From<Feet> for Meters {\n    fn from(feet: Feet) -> Self {\n        Meters(feet.0 * 0.3048)\n    }\n}\n\n// Now both work:\nlet m = Meters::from(Feet(10.0));\nlet m: Meters = Feet(10.0).into();\n```\n\n### Common Uses\n```rust\n// String from &str\nlet s: String = \"hello\".into();\nlet s = String::from(\"hello\");\n\n// PathBuf from &str\nlet p: PathBuf = \"./file.txt\".into();\n\n// Vec from array\nlet v: Vec<i32> = [1, 2, 3].into();\n```\n\n### In Function Parameters\n```rust\n// Accept anything that converts to String\nfn greet(name: impl Into<String>) {\n    let name = name.into();\n    println!(\"Hello, {}\", name);\n}\n\ngreet(\"Alice\");           // &str\ngreet(String::from(\"Bob\")); // String\n```\n\n### TryFrom for Fallible Conversions\n```rust\nimpl TryFrom<i32> for PositiveInt {\n    type Error = &'static str;\n    \n    fn try_from(value: i32) -> Result<Self, Self::Error> {\n        if value > 0 {\n            Ok(PositiveInt(value))\n        } else {\n            Err(\"must be positive\")\n        }\n    }\n}\n```",
-            "confidence": 0.6,
-            "contexts": [
-                "general"
-            ]
-        },
-        {
-            "id": "display-debug-trait",
-            "pattern": "impl\\s+Display|impl\\s+Debug|fmt::Result",
-            "title": "Display vs Debug",
-            "rustTerm": "Display and Debug traits",
-            "explanation": "Debug ({:?}) is for developers, Display ({}) is for users. Derive Debug, implement Display manually.",
-            "example": "// Debug: #[derive(Debug)] or impl Debug\n// Display: impl Display (manual only)\nprintln!(\"{:?}\", val);  // Debug\nprintln!(\"{}\", val);    // Display",
-            "deepExplanation": "## Display vs Debug\n\n### Debug - For Developers\n```rust\n#[derive(Debug)]\nstruct Point { x: i32, y: i32 }\n\nlet p = Point { x: 10, y: 20 };\nprintln!(\"{:?}\", p);   // Point { x: 10, y: 20 }\nprintln!(\"{:#?}\", p);  // Pretty-printed\n```\n\n### Display - For Users\n```rust\nuse std::fmt;\n\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\n\nprintln!(\"{}\", p);  // (10, 20)\n```\n\n### When to Use Which\n| Format | Trait | Purpose |\n|--------|-------|--------|\n| `{}` | Display | User-facing output |\n| `{:?}` | Debug | Developer debugging |\n| `{:#?}` | Debug | Pretty-printed debug |\n\n### Display Enables .to_string()\n```rust\nimpl Display for Point { ... }\n\nlet s = p.to_string();  // \"(10, 20)\"\n```\n\n### Error Messages\n```rust\n// Errors should implement Display for user messages\nimpl Display for MyError {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"Operation failed: {}\", self.reason)\n    }\n}\n```",
-            "confidence": 0.6,
-            "contexts": [
-                "general"
-            ]
-        },
-        {
-            "id": "default-trait",
-            "pattern": "#\\[derive\\([^)]*Default|impl\\s+Default|Default::default",
-            "title": "Default Trait",
-            "rustTerm": "Default trait",
-            "explanation": "Default provides a default value for a type. Use `..Default::default()` for partial struct initialization.",
-            "example": "let config = Config {\n    name: \"custom\".into(),\n    ..Default::default()  // Fill rest with defaults\n};",
-            "deepExplanation": "## Default Trait\n\nProvides a sensible default value.\n\n### Deriving Default\n```rust\n#[derive(Default)]\nstruct Config {\n    enabled: bool,     // defaults to false\n    count: u32,        // defaults to 0\n    name: String,      // defaults to \"\"\n}\n\nlet config = Config::default();\n```\n\n### Custom Default\n```rust\nimpl Default for Config {\n    fn default() -> Self {\n        Config {\n            enabled: true,\n            count: 10,\n            name: String::from(\"default\"),\n        }\n    }\n}\n```\n\n### Partial Initialization\n```rust\nlet config = Config {\n    name: \"custom\".into(),\n    ..Default::default()  // Rest from default\n};\n```\n\n### With Option\n```rust\nlet value = opt.unwrap_or_default();\n```\n\n### In Generic Code\n```rust\nfn get_or_default<T: Default>(opt: Option<T>) -> T {\n    opt.unwrap_or_default()\n}\n```\n\n### Builder Pattern Alternative\n```rust\nConfig::default()\n    .with_name(\"custom\")\n    .with_count(5)\n```",
-            "confidence": 0.5,
-            "contexts": [
-                "general"
-            ]
-        },
-        {
-            "id": "dyn-trait",
-            "pattern": "dyn\\s+\\w+|Box<dyn|&dyn",
-            "title": "Dynamic Dispatch",
-            "rustTerm": "dyn Trait",
-            "explanation": "Use `dyn Trait` for runtime polymorphism (trait objects). Requires `Box`, `&`, or `Rc` because size is unknown.",
-            "example": "fn process(handler: &dyn Handler) { ... }\nlet handlers: Vec<Box<dyn Handler>> = vec![];",
-            "deepExplanation": "## Dynamic Dispatch with dyn\n\n### Static vs Dynamic Dispatch\n```rust\n// Static (monomorphization) - faster\nfn process<T: Handler>(h: T) { ... }\n\n// Dynamic (vtable lookup) - flexible\nfn process(h: &dyn Handler) { ... }\n```\n\n### Why Box/&/Rc?\n```rust\n// Won't compile - size unknown at compile time\nlet handler: dyn Handler = ...;  // Error!\n\n// These work - known size (pointer)\nlet handler: &dyn Handler = &concrete;\nlet handler: Box<dyn Handler> = Box::new(concrete);\nlet handler: Rc<dyn Handler> = Rc::new(concrete);\n```\n\n### Heterogeneous Collections\n```rust\ntrait Animal {\n    fn speak(&self);\n}\n\nlet animals: Vec<Box<dyn Animal>> = vec![\n    Box::new(Dog {}),\n    Box::new(Cat {}),\n    Box::new(Bird {}),\n];\n\nfor animal in &animals {\n    animal.speak();  // Runtime dispatch\n}\n```\n\n### Object Safety\nNot all traits can be made into trait objects:\n```rust\n// Object-safe (can use dyn)\ntrait Drawable {\n    fn draw(&self);\n}\n\n// NOT object-safe (can't use dyn)\ntrait Cloneable {\n    fn clone(&self) -> Self;  // Returns Self\n}\n```\n\n### When to Use\n- **dyn**: Different types at runtime, smaller binary\n- **impl/generics**: Known types, better performance",
-            "confidence": 0.7,
-            "contexts": [
-                "general"
-            ]
-        },
-        {
-            "id": "impl-trait-return",
-            "pattern": "->\\s*impl\\s+\\w+",
-            "title": "impl Trait in Return",
-            "rustTerm": "impl Trait",
-            "explanation": "Return `impl Trait` when you want to hide the concrete type. The actual type is still known at compile time.",
-            "example": "fn make_iter() -> impl Iterator<Item = i32> {\n    (0..10).filter(|x| x % 2 == 0)\n}",
-            "deepExplanation": "## impl Trait in Return Position\n\nHide concrete type while keeping static dispatch.\n\n### The Problem\n```rust\n// Return type is complex and leaks implementation\nfn make_iter() -> std::iter::Filter<std::ops::Range<i32>, fn(&i32) -> bool> {\n    (0..10).filter(|x| x % 2 == 0)\n}\n```\n\n### The Solution\n```rust\nfn make_iter() -> impl Iterator<Item = i32> {\n    (0..10).filter(|x| x % 2 == 0)\n}\n```\n\n### Benefits\n- Clean API - users don't see implementation details\n- Static dispatch - no runtime cost\n- Can change implementation without breaking API\n\n### Closures\n```rust\n// Closures have unnameable types\nfn make_adder(n: i32) -> impl Fn(i32) -> i32 {\n    move |x| x + n\n}\n```\n\n### Limitations\n```rust\n// Can't return different types\nfn make_iter(flag: bool) -> impl Iterator<Item = i32> {\n    if flag {\n        vec![1, 2, 3].into_iter()  // Vec iterator\n    } else {\n        (0..3)  // Range iterator - ERROR!\n    }\n}\n\n// Use Box<dyn> for this\nfn make_iter(flag: bool) -> Box<dyn Iterator<Item = i32>> {\n    if flag {\n        Box::new(vec![1, 2, 3].into_iter())\n    } else {\n        Box::new(0..3)\n    }\n}\n```",
-            "confidence": 0.7,
-            "contexts": [
-                "general"
-            ]
-        },
-        {
-            "id": "associated-types",
-            "pattern": "type\\s+\\w+\\s*=|type\\s+\\w+\\s*;",
-            "title": "Associated Types",
-            "rustTerm": "associated types",
-            "explanation": "Associated types define a type placeholder in a trait. Cleaner than generics when there's one logical type.",
-            "example": "trait Iterator {\n    type Item;  // Associated type\n    fn next(&mut self) -> Option<Self::Item>;\n}",
-            "deepExplanation": "## Associated Types\n\n### In Trait Definition\n```rust\ntrait Iterator {\n    type Item;  // Associated type\n    \n    fn next(&mut self) -> Option<Self::Item>;\n}\n```\n\n### In Implementation\n```rust\nimpl Iterator for Counter {\n    type Item = u32;  // Concrete type\n    \n    fn next(&mut self) -> Option<Self::Item> {\n        // ...\n    }\n}\n```\n\n### vs Generics\n```rust\n// With generics - multiple impls possible\ntrait Container<T> {\n    fn get(&self) -> T;\n}\n\nimpl Container<i32> for MyType { ... }\nimpl Container<String> for MyType { ... }\n\n// With associated types - one impl per type\ntrait Container {\n    type Item;\n    fn get(&self) -> Self::Item;\n}\n\nimpl Container for MyType {\n    type Item = i32;  // Only one choice\n    fn get(&self) -> i32 { ... }\n}\n```\n\n### When to Use Which\n| Use | When |\n|-----|------|\n| Associated type | One logical output type per impl |\n| Generic | Multiple implementations make sense |\n\n### With Bounds\n```rust\ntrait Graph {\n    type Node: Clone + Debug;\n    type Edge: Clone;\n    \n    fn nodes(&self) -> Vec<Self::Node>;\n}\n```",
-            "confidence": 0.5,
-            "contexts": [
-                "general"
-            ]
-        },
-        {
-            "id": "where-clause",
-            "pattern": "where\\s+\\w+\\s*:",
-            "title": "Where Clauses",
-            "rustTerm": "where clause",
-            "explanation": "Use `where` clauses for complex trait bounds. Cleaner than inline bounds for multiple constraints.",
-            "example": "fn process<T, U>(t: T, u: U) -> i32\nwhere\n    T: Clone + Debug,\n    U: Into<String>,\n{ ... }",
-            "deepExplanation": "## Where Clauses\n\nCleaner syntax for complex trait bounds.\n\n### Basic Usage\n```rust\n// Inline bounds (cluttered)\nfn process<T: Clone + Debug + PartialEq, U: Into<String> + Default>(t: T, u: U) { }\n\n// Where clause (clearer)\nfn process<T, U>(t: T, u: U)\nwhere\n    T: Clone + Debug + PartialEq,\n    U: Into<String> + Default,\n{\n    // ...\n}\n```\n\n### When Required\n```rust\n// Bounds on associated types\nfn process<I>(iter: I)\nwhere\n    I: Iterator,\n    I::Item: Debug,  // Can't do this inline\n{\n    for item in iter {\n        println!(\"{:?}\", item);\n    }\n}\n```\n\n### On Impl Blocks\n```rust\nimpl<T> MyStruct<T>\nwhere\n    T: Clone + Debug,\n{\n    fn new(value: T) -> Self {\n        // ...\n    }\n}\n```\n\n### Multiple Where Clauses\n```rust\nfn complex<A, B, C>(a: A, b: B, c: C)\nwhere\n    A: Clone,\n    B: Clone + Into<A>,\n    C: Default + From<B>,\n{\n    // ...\n}\n```\n\n### Style Guideline\n- 1-2 simple bounds: inline\n- 3+ bounds or complex bounds: where clause",
-            "confidence": 0.5,
-            "contexts": [
-                "general"
-            ]
-        },
-        {
-            "id": "phantom-data",
-            "pattern": "PhantomData|std::marker::PhantomData",
-            "title": "PhantomData",
-            "rustTerm": "PhantomData<T>",
-            "explanation": "PhantomData tells the compiler your type logically owns a T, even if it doesn't store one directly.",
-            "example": "struct Iter<'a, T> {\n    ptr: *const T,\n    _marker: PhantomData<&'a T>,\n}",
-            "deepExplanation": "## PhantomData\n\nMarker for type-level information without runtime cost.\n\n### Why Needed\n```rust\nstruct Iter<T> {\n    ptr: *const T,  // Raw pointer, no ownership\n}\n// Compiler doesn't know Iter relates to T's lifetime!\n```\n\n### The Fix\n```rust\nuse std::marker::PhantomData;\n\nstruct Iter<'a, T> {\n    ptr: *const T,\n    _marker: PhantomData<&'a T>,  // \"I act like I have &'a T\"\n}\n```\n\n### Common Uses\n\n**Lifetime markers:**\n```rust\nstruct Parser<'a> {\n    pos: usize,\n    _lifetime: PhantomData<&'a str>,\n}\n```\n\n**Type markers:**\n```rust\nstruct TypedId<T> {\n    id: u64,\n    _type: PhantomData<T>,  // Id \"of\" T\n}\n\nlet user_id: TypedId<User> = ...;\nlet post_id: TypedId<Post> = ...;\n// Can't mix them up!\n```\n\n**Variance control:**\n```rust\nstruct Covariant<T>(PhantomData<T>);       // Covariant\nstruct Contravariant<T>(PhantomData<fn(T)>); // Contravariant\nstruct Invariant<T>(PhantomData<fn(T) -> T>); // Invariant\n```\n\n### Zero-Sized\n```rust\nassert_eq!(std::mem::size_of::<PhantomData<String>>(), 0);\n```",
-            "confidence": 0.8,
-            "contexts": [
-                "general"
-            ]
-        }
-    ]
+	"category": "Traits and Types",
+	"rules": [
+		{
+			"id": "impl-trait",
+			"pattern": "impl\\s+\\w+\\s*\\{|impl\\s+\\w+\\s+for",
+			"title": "Implementing Traits",
+			"rustTerm": "impl blocks",
+			"explanation": "Use `impl` to add methods to types or implement traits. `impl Trait for Type` implements a trait.",
+			"example": "impl Display for MyType {\n    fn fmt(&self, f: &mut Formatter) -> fmt::Result {\n        write!(f, \"...\")\n    }\n}",
+			"deepExplanation": "## impl Blocks\n\n### Inherent Implementation\n```rust\nstruct Counter {\n    value: u32,\n}\n\nimpl Counter {\n    // Associated function (no self)\n    fn new() -> Self {\n        Counter { value: 0 }\n    }\n    \n    // Method (has self)\n    fn increment(&mut self) {\n        self.value += 1;\n    }\n    \n    fn get(&self) -> u32 {\n        self.value\n    }\n}\n```\n\n### Trait Implementation\n```rust\nimpl Display for Counter {\n    fn fmt(&self, f: &mut Formatter) -> fmt::Result {\n        write!(f, \"Counter({})\", self.value)\n    }\n}\n```\n\n### self Variants\n| Signature | Meaning |\n|-----------|--------|\n| `&self` | Borrow immutably |\n| `&mut self` | Borrow mutably |\n| `self` | Take ownership |\n| `Self` | The implementing type |\n\n### Multiple impl Blocks\n```rust\n// You can have multiple impl blocks\nimpl Counter {\n    fn new() -> Self { ... }\n}\n\nimpl Counter {\n    fn increment(&mut self) { ... }\n}\n```",
+			"confidence": 0.4,
+			"contexts": ["general"]
+		},
+		{
+			"id": "derive-macro",
+			"pattern": "#\\[derive\\(",
+			"title": "Derive Macro",
+			"rustTerm": "#[derive(...)]",
+			"explanation": "Derive automatically implements common traits. Most types should derive Debug at minimum.",
+			"example": "#[derive(Debug, Clone, PartialEq)]\nstruct Point { x: i32, y: i32 }",
+			"deepExplanation": "## Derive Macro\n\nAutomatically implement common traits.\n\n### Common Derives\n```rust\n#[derive(\n    Debug,      // {:?} formatting\n    Clone,      // .clone() method\n    Copy,       // Implicit copy (small types only)\n    PartialEq,  // == comparison\n    Eq,         // Total equality (requires PartialEq)\n    Hash,       // Can be HashMap key (requires Eq)\n    Default,    // Default::default()\n    PartialOrd, // <, >, <=, >= comparison\n    Ord,        // Total ordering (requires PartialOrd + Eq)\n)]\nstruct Point { x: i32, y: i32 }\n```\n\n### When to Derive What\n| Trait | When to use |\n|-------|------------|\n| `Debug` | Almost always - enables println!(\"{:?}\", x) |\n| `Clone` | When you need to duplicate values |\n| `Copy` | Small, stack-only types (like i32, bool) |\n| `PartialEq` | When you need == comparisons |\n| `Hash` | When using as HashMap/HashSet key |\n| `Default` | When there's a sensible default |\n\n### Derive Requirements\n```rust\n// All fields must implement the trait\n#[derive(Clone)]\nstruct Container {\n    data: Vec<u8>,  // Vec implements Clone ✓\n    id: u32,        // u32 implements Clone ✓\n}\n```\n\n### Serde for Serialization\n```rust\n#[derive(Serialize, Deserialize)]\nstruct Config {\n    name: String,\n    count: u32,\n}\n```",
+			"confidence": 0.5,
+			"contexts": ["general"]
+		},
+		{
+			"id": "from-into-trait",
+			"pattern": "impl\\s+From<|impl\\s+Into<|\\.into\\(\\)|\\.from\\(",
+			"title": "From/Into Conversions",
+			"rustTerm": "From and Into traits",
+			"explanation": "From/Into provide type conversions. Implement From and you get Into for free. Use `.into()` for ergonomic conversions.",
+			"example": "let s: String = \"hello\".into();\n// Same as: String::from(\"hello\")",
+			"deepExplanation": "## From and Into Traits\n\n### The Relationship\n- Implement `From<T>` to get `Into<T>` automatically\n- Always implement `From`, never `Into` directly\n\n### Implementing From\n```rust\nstruct Meters(f64);\nstruct Feet(f64);\n\nimpl From<Feet> for Meters {\n    fn from(feet: Feet) -> Self {\n        Meters(feet.0 * 0.3048)\n    }\n}\n\n// Now both work:\nlet m = Meters::from(Feet(10.0));\nlet m: Meters = Feet(10.0).into();\n```\n\n### Common Uses\n```rust\n// String from &str\nlet s: String = \"hello\".into();\nlet s = String::from(\"hello\");\n\n// PathBuf from &str\nlet p: PathBuf = \"./file.txt\".into();\n\n// Vec from array\nlet v: Vec<i32> = [1, 2, 3].into();\n```\n\n### In Function Parameters\n```rust\n// Accept anything that converts to String\nfn greet(name: impl Into<String>) {\n    let name = name.into();\n    println!(\"Hello, {}\", name);\n}\n\ngreet(\"Alice\");           // &str\ngreet(String::from(\"Bob\")); // String\n```\n\n### TryFrom for Fallible Conversions\n```rust\nimpl TryFrom<i32> for PositiveInt {\n    type Error = &'static str;\n    \n    fn try_from(value: i32) -> Result<Self, Self::Error> {\n        if value > 0 {\n            Ok(PositiveInt(value))\n        } else {\n            Err(\"must be positive\")\n        }\n    }\n}\n```",
+			"confidence": 0.6,
+			"contexts": ["general"]
+		},
+		{
+			"id": "display-debug-trait",
+			"pattern": "impl\\s+Display|impl\\s+Debug|fmt::Result",
+			"title": "Display vs Debug",
+			"rustTerm": "Display and Debug traits",
+			"explanation": "Debug ({:?}) is for developers, Display ({}) is for users. Derive Debug, implement Display manually.",
+			"example": "// Debug: #[derive(Debug)] or impl Debug\n// Display: impl Display (manual only)\nprintln!(\"{:?}\", val);  // Debug\nprintln!(\"{}\", val);    // Display",
+			"deepExplanation": "## Display vs Debug\n\n### Debug - For Developers\n```rust\n#[derive(Debug)]\nstruct Point { x: i32, y: i32 }\n\nlet p = Point { x: 10, y: 20 };\nprintln!(\"{:?}\", p);   // Point { x: 10, y: 20 }\nprintln!(\"{:#?}\", p);  // Pretty-printed\n```\n\n### Display - For Users\n```rust\nuse std::fmt;\n\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\n\nprintln!(\"{}\", p);  // (10, 20)\n```\n\n### When to Use Which\n| Format | Trait | Purpose |\n|--------|-------|--------|\n| `{}` | Display | User-facing output |\n| `{:?}` | Debug | Developer debugging |\n| `{:#?}` | Debug | Pretty-printed debug |\n\n### Display Enables .to_string()\n```rust\nimpl Display for Point { ... }\n\nlet s = p.to_string();  // \"(10, 20)\"\n```\n\n### Error Messages\n```rust\n// Errors should implement Display for user messages\nimpl Display for MyError {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"Operation failed: {}\", self.reason)\n    }\n}\n```",
+			"confidence": 0.6,
+			"contexts": ["general"]
+		},
+		{
+			"id": "default-trait",
+			"pattern": "#\\[derive\\([^)]*Default|impl\\s+Default|Default::default",
+			"title": "Default Trait",
+			"rustTerm": "Default trait",
+			"explanation": "Default provides a default value for a type. Use `..Default::default()` for partial struct initialization.",
+			"example": "let config = Config {\n    name: \"custom\".into(),\n    ..Default::default()  // Fill rest with defaults\n};",
+			"deepExplanation": "## Default Trait\n\nProvides a sensible default value.\n\n### Deriving Default\n```rust\n#[derive(Default)]\nstruct Config {\n    enabled: bool,     // defaults to false\n    count: u32,        // defaults to 0\n    name: String,      // defaults to \"\"\n}\n\nlet config = Config::default();\n```\n\n### Custom Default\n```rust\nimpl Default for Config {\n    fn default() -> Self {\n        Config {\n            enabled: true,\n            count: 10,\n            name: String::from(\"default\"),\n        }\n    }\n}\n```\n\n### Partial Initialization\n```rust\nlet config = Config {\n    name: \"custom\".into(),\n    ..Default::default()  // Rest from default\n};\n```\n\n### With Option\n```rust\nlet value = opt.unwrap_or_default();\n```\n\n### In Generic Code\n```rust\nfn get_or_default<T: Default>(opt: Option<T>) -> T {\n    opt.unwrap_or_default()\n}\n```\n\n### Builder Pattern Alternative\n```rust\nConfig::default()\n    .with_name(\"custom\")\n    .with_count(5)\n```",
+			"confidence": 0.5,
+			"contexts": ["general"]
+		},
+		{
+			"id": "dyn-trait",
+			"pattern": "dyn\\s+\\w+|Box<dyn|&dyn",
+			"title": "Dynamic Dispatch",
+			"rustTerm": "dyn Trait",
+			"explanation": "Use `dyn Trait` for runtime polymorphism (trait objects). Requires `Box`, `&`, or `Rc` because size is unknown.",
+			"example": "fn process(handler: &dyn Handler) { ... }\nlet handlers: Vec<Box<dyn Handler>> = vec![];",
+			"deepExplanation": "## Dynamic Dispatch with dyn\n\n### Static vs Dynamic Dispatch\n```rust\n// Static (monomorphization) - faster\nfn process<T: Handler>(h: T) { ... }\n\n// Dynamic (vtable lookup) - flexible\nfn process(h: &dyn Handler) { ... }\n```\n\n### Why Box/&/Rc?\n```rust\n// Won't compile - size unknown at compile time\nlet handler: dyn Handler = ...;  // Error!\n\n// These work - known size (pointer)\nlet handler: &dyn Handler = &concrete;\nlet handler: Box<dyn Handler> = Box::new(concrete);\nlet handler: Rc<dyn Handler> = Rc::new(concrete);\n```\n\n### Heterogeneous Collections\n```rust\ntrait Animal {\n    fn speak(&self);\n}\n\nlet animals: Vec<Box<dyn Animal>> = vec![\n    Box::new(Dog {}),\n    Box::new(Cat {}),\n    Box::new(Bird {}),\n];\n\nfor animal in &animals {\n    animal.speak();  // Runtime dispatch\n}\n```\n\n### Object Safety\nNot all traits can be made into trait objects:\n```rust\n// Object-safe (can use dyn)\ntrait Drawable {\n    fn draw(&self);\n}\n\n// NOT object-safe (can't use dyn)\ntrait Cloneable {\n    fn clone(&self) -> Self;  // Returns Self\n}\n```\n\n### When to Use\n- **dyn**: Different types at runtime, smaller binary\n- **impl/generics**: Known types, better performance",
+			"confidence": 0.7,
+			"contexts": ["general"]
+		},
+		{
+			"id": "impl-trait-return",
+			"pattern": "->\\s*impl\\s+\\w+",
+			"title": "impl Trait in Return",
+			"rustTerm": "impl Trait",
+			"explanation": "Return `impl Trait` when you want to hide the concrete type. The actual type is still known at compile time.",
+			"example": "fn make_iter() -> impl Iterator<Item = i32> {\n    (0..10).filter(|x| x % 2 == 0)\n}",
+			"deepExplanation": "## impl Trait in Return Position\n\nHide concrete type while keeping static dispatch.\n\n### The Problem\n```rust\n// Return type is complex and leaks implementation\nfn make_iter() -> std::iter::Filter<std::ops::Range<i32>, fn(&i32) -> bool> {\n    (0..10).filter(|x| x % 2 == 0)\n}\n```\n\n### The Solution\n```rust\nfn make_iter() -> impl Iterator<Item = i32> {\n    (0..10).filter(|x| x % 2 == 0)\n}\n```\n\n### Benefits\n- Clean API - users don't see implementation details\n- Static dispatch - no runtime cost\n- Can change implementation without breaking API\n\n### Closures\n```rust\n// Closures have unnameable types\nfn make_adder(n: i32) -> impl Fn(i32) -> i32 {\n    move |x| x + n\n}\n```\n\n### Limitations\n```rust\n// Can't return different types\nfn make_iter(flag: bool) -> impl Iterator<Item = i32> {\n    if flag {\n        vec![1, 2, 3].into_iter()  // Vec iterator\n    } else {\n        (0..3)  // Range iterator - ERROR!\n    }\n}\n\n// Use Box<dyn> for this\nfn make_iter(flag: bool) -> Box<dyn Iterator<Item = i32>> {\n    if flag {\n        Box::new(vec![1, 2, 3].into_iter())\n    } else {\n        Box::new(0..3)\n    }\n}\n```",
+			"confidence": 0.7,
+			"contexts": ["general"]
+		},
+		{
+			"id": "associated-types",
+			"pattern": "type\\s+\\w+\\s*=|type\\s+\\w+\\s*;",
+			"title": "Associated Types",
+			"rustTerm": "associated types",
+			"explanation": "Associated types define a type placeholder in a trait. Cleaner than generics when there's one logical type.",
+			"example": "trait Iterator {\n    type Item;  // Associated type\n    fn next(&mut self) -> Option<Self::Item>;\n}",
+			"deepExplanation": "## Associated Types\n\n### In Trait Definition\n```rust\ntrait Iterator {\n    type Item;  // Associated type\n    \n    fn next(&mut self) -> Option<Self::Item>;\n}\n```\n\n### In Implementation\n```rust\nimpl Iterator for Counter {\n    type Item = u32;  // Concrete type\n    \n    fn next(&mut self) -> Option<Self::Item> {\n        // ...\n    }\n}\n```\n\n### vs Generics\n```rust\n// With generics - multiple impls possible\ntrait Container<T> {\n    fn get(&self) -> T;\n}\n\nimpl Container<i32> for MyType { ... }\nimpl Container<String> for MyType { ... }\n\n// With associated types - one impl per type\ntrait Container {\n    type Item;\n    fn get(&self) -> Self::Item;\n}\n\nimpl Container for MyType {\n    type Item = i32;  // Only one choice\n    fn get(&self) -> i32 { ... }\n}\n```\n\n### When to Use Which\n| Use | When |\n|-----|------|\n| Associated type | One logical output type per impl |\n| Generic | Multiple implementations make sense |\n\n### With Bounds\n```rust\ntrait Graph {\n    type Node: Clone + Debug;\n    type Edge: Clone;\n    \n    fn nodes(&self) -> Vec<Self::Node>;\n}\n```",
+			"confidence": 0.5,
+			"contexts": ["general"]
+		},
+		{
+			"id": "where-clause",
+			"pattern": "where\\s+\\w+\\s*:",
+			"title": "Where Clauses",
+			"rustTerm": "where clause",
+			"explanation": "Use `where` clauses for complex trait bounds. Cleaner than inline bounds for multiple constraints.",
+			"example": "fn process<T, U>(t: T, u: U) -> i32\nwhere\n    T: Clone + Debug,\n    U: Into<String>,\n{ ... }",
+			"deepExplanation": "## Where Clauses\n\nCleaner syntax for complex trait bounds.\n\n### Basic Usage\n```rust\n// Inline bounds (cluttered)\nfn process<T: Clone + Debug + PartialEq, U: Into<String> + Default>(t: T, u: U) { }\n\n// Where clause (clearer)\nfn process<T, U>(t: T, u: U)\nwhere\n    T: Clone + Debug + PartialEq,\n    U: Into<String> + Default,\n{\n    // ...\n}\n```\n\n### When Required\n```rust\n// Bounds on associated types\nfn process<I>(iter: I)\nwhere\n    I: Iterator,\n    I::Item: Debug,  // Can't do this inline\n{\n    for item in iter {\n        println!(\"{:?}\", item);\n    }\n}\n```\n\n### On Impl Blocks\n```rust\nimpl<T> MyStruct<T>\nwhere\n    T: Clone + Debug,\n{\n    fn new(value: T) -> Self {\n        // ...\n    }\n}\n```\n\n### Multiple Where Clauses\n```rust\nfn complex<A, B, C>(a: A, b: B, c: C)\nwhere\n    A: Clone,\n    B: Clone + Into<A>,\n    C: Default + From<B>,\n{\n    // ...\n}\n```\n\n### Style Guideline\n- 1-2 simple bounds: inline\n- 3+ bounds or complex bounds: where clause",
+			"confidence": 0.5,
+			"contexts": ["general"]
+		},
+		{
+			"id": "phantom-data",
+			"pattern": "PhantomData|std::marker::PhantomData",
+			"title": "PhantomData",
+			"rustTerm": "PhantomData<T>",
+			"explanation": "PhantomData tells the compiler your type logically owns a T, even if it doesn't store one directly.",
+			"example": "struct Iter<'a, T> {\n    ptr: *const T,\n    _marker: PhantomData<&'a T>,\n}",
+			"deepExplanation": "## PhantomData\n\nMarker for type-level information without runtime cost.\n\n### Why Needed\n```rust\nstruct Iter<T> {\n    ptr: *const T,  // Raw pointer, no ownership\n}\n// Compiler doesn't know Iter relates to T's lifetime!\n```\n\n### The Fix\n```rust\nuse std::marker::PhantomData;\n\nstruct Iter<'a, T> {\n    ptr: *const T,\n    _marker: PhantomData<&'a T>,  // \"I act like I have &'a T\"\n}\n```\n\n### Common Uses\n\n**Lifetime markers:**\n```rust\nstruct Parser<'a> {\n    pos: usize,\n    _lifetime: PhantomData<&'a str>,\n}\n```\n\n**Type markers:**\n```rust\nstruct TypedId<T> {\n    id: u64,\n    _type: PhantomData<T>,  // Id \"of\" T\n}\n\nlet user_id: TypedId<User> = ...;\nlet post_id: TypedId<Post> = ...;\n// Can't mix them up!\n```\n\n**Variance control:**\n```rust\nstruct Covariant<T>(PhantomData<T>);       // Covariant\nstruct Contravariant<T>(PhantomData<fn(T)>); // Contravariant\nstruct Invariant<T>(PhantomData<fn(T) -> T>); // Invariant\n```\n\n### Zero-Sized\n```rust\nassert_eq!(std::mem::size_of::<PhantomData<String>>(), 0);\n```",
+			"confidence": 0.8,
+			"contexts": ["general"]
+		},
+		{
+			"id": "method-with-self",
+			"pattern": "fn\\s+\\w+\\s*\\([^)]*&\\s*self",
+			"antiPattern": null,
+			"hintLevel": "info",
+			"csTerms": ["instance method", "member function"],
+			"rustTerm": "Method (&self)",
+			"explanation": "This is a METHOD - it takes &self, so it needs an instance to be called. Call it with dot notation: instance.method()",
+			"example": "impl Rectangle {\n    fn area(&self) -> u32 {\n        self.width * self.height\n    }\n}\n// Called as: rect.area()",
+			"deepExplanation": "## Methods vs Associated Functions\n\nThis is one of the most important concepts in Rust (and OOP in general)!\n\n### What is a Method?\n\nA **method** is a function that operates on an **instance** of a type. It always has `self` as its first parameter:\n\n```rust\nimpl Rectangle {\n    // This is a METHOD - needs an instance\n    fn area(&self) -> u32 {\n        self.width * self.height\n    }\n}\n```\n\n### The `self` Parameter\n\n| Syntax | Meaning | When to Use |\n|--------|---------|-------------|\n| `&self` | Immutable borrow | Reading data (most common) |\n| `&mut self` | Mutable borrow | Modifying data |\n| `self` | Takes ownership | Transforming/consuming |\n\n### How to Call a Method\n\nMethods use **dot notation** on an instance:\n\n```rust\nlet rect = Rectangle { width: 10, height: 5 };\nlet area = rect.area();  // Dot notation!\n```\n\n### Coming from Other Languages?\n\n| Language | Rust Equivalent |\n|----------|----------------|\n| C# | `public int Area() { ... }` → `fn area(&self) -> i32` |\n| Java | `public int area() { ... }` → `fn area(&self) -> i32` |\n| Python | `def area(self): ...` → `fn area(&self) -> ...` |\n| C++ | `int area() { ... }` → `fn area(&self) -> i32` |\n\nIn Rust, `self` is always **explicit** - you write it out. In C#/Java, `this` is implicit.",
+			"confidence": 0.9,
+			"contexts": ["general"]
+		},
+		{
+			"id": "method-with-mut-self",
+			"pattern": "fn\\s+\\w+\\s*\\([^)]*&\\s*mut\\s+self",
+			"antiPattern": null,
+			"hintLevel": "info",
+			"csTerms": ["mutating method", "setter"],
+			"rustTerm": "Mutable Method (&mut self)",
+			"explanation": "This method takes &mut self - it can MODIFY the instance. The caller must have a mutable reference.",
+			"example": "impl Counter {\n    fn increment(&mut self) {\n        self.count += 1;\n    }\n}\n// Caller needs: let mut counter = Counter::new();",
+			"deepExplanation": "## Mutable Methods (&mut self)\n\nWhen a method needs to **modify** the instance, it takes `&mut self`.\n\n### Example\n\n```rust\nimpl Counter {\n    fn increment(&mut self) {\n        self.count += 1;  // Modifies self\n    }\n    \n    fn get(&self) -> u32 {\n        self.count  // Just reads, uses &self\n    }\n}\n```\n\n### Caller Requirements\n\nThe caller must have a **mutable** binding:\n\n```rust\nlet mut counter = Counter::new();  // Must be `mut`!\ncounter.increment();  // OK\n\nlet counter2 = Counter::new();  // Not mutable\ncounter2.increment();  // ❌ ERROR: cannot borrow as mutable\n```\n\n### Common Patterns\n\n**Setters:**\n```rust\nimpl User {\n    fn set_name(&mut self, name: String) {\n        self.name = name;\n    }\n}\n```\n\n**In-place operations:**\n```rust\nimpl Vec<T> {\n    fn push(&mut self, value: T) { ... }\n    fn clear(&mut self) { ... }\n    fn sort(&mut self) { ... }\n}\n```\n\n### Coming from Other Languages\n\n| Language | Equivalent |\n|----------|------------|\n| C# | Any method that modifies `this` |\n| Java | Any non-final method modifying fields |\n| C++ | Non-const member function |\n\nRust makes mutability **explicit** in the signature!",
+			"confidence": 0.9,
+			"contexts": ["general"]
+		},
+		{
+			"id": "method-consuming-self",
+			"pattern": "fn\\s+\\w+\\s*\\(\\s*self\\s*[,)]",
+			"antiPattern": "&\\s*self|&\\s*mut\\s+self",
+			"hintLevel": "watch",
+			"csTerms": ["consuming method", "move semantics"],
+			"rustTerm": "Consuming Method (self)",
+			"explanation": "This method takes ownership of self - after calling it, the original instance is GONE. Often used for transformations or builders.",
+			"example": "impl StringBuilder {\n    fn build(self) -> String {\n        self.buffer  // Takes ownership, returns final value\n    }\n}",
+			"deepExplanation": "## Consuming Methods (self)\n\nWhen a method takes `self` (not `&self`), it **takes ownership** of the instance.\n\n### What This Means\n\n```rust\nimpl StringBuilder {\n    fn build(self) -> String {\n        self.buffer\n    }\n}\n\nlet builder = StringBuilder::new();\nlet result = builder.build();  // builder is MOVED\n// builder.build();  // ❌ ERROR: value used after move\n```\n\n### Why Use This?\n\n**1. Transformations:**\n```rust\nimpl Option<T> {\n    fn unwrap(self) -> T { ... }  // Consumes the Option\n}\n```\n\n**2. Builder Pattern (final step):**\n```rust\nimpl RequestBuilder {\n    fn header(mut self, k: &str, v: &str) -> Self {\n        self.headers.insert(k, v);\n        self  // Returns self for chaining\n    }\n    \n    fn send(self) -> Response {  // Final, consuming\n        // Build and send request\n    }\n}\n\n// Fluent API:\nlet response = Request::new()\n    .header(\"Content-Type\", \"json\")\n    .header(\"Auth\", token)\n    .send();  // Can't use builder after this\n```\n\n**3. Converting types:**\n```rust\nimpl String {\n    fn into_bytes(self) -> Vec<u8> { ... }\n}\n```\n\n### Watch Out!\n\nIf you see `self` without `&`, the instance will be consumed. This is intentional - it prevents using invalid state.",
+			"confidence": 0.85,
+			"contexts": ["general"]
+		},
+		{
+			"id": "associated-function-new",
+			"pattern": "fn\\s+new\\s*\\([^)]*\\)\\s*->\\s*(Self|[A-Z]\\w*)",
+			"antiPattern": "&?\\s*(mut\\s+)?self",
+			"hintLevel": "info",
+			"csTerms": ["constructor", "static factory method"],
+			"rustTerm": "Associated Function (constructor)",
+			"explanation": "This is an ASSOCIATED FUNCTION, not a method! It has no 'self' parameter. It's Rust's version of a constructor. Call it with :: syntax: Type::new()",
+			"example": "impl Rectangle {\n    fn new(width: u32, height: u32) -> Self {\n        Self { width, height }\n    }\n}\n// Called as: Rectangle::new(10, 5)",
+			"suggestedFix": {
+				"search": "",
+				"replace": "",
+				"description": "Call with Type::new() syntax, not dot notation"
+			},
+			"deepExplanation": "## Associated Functions (Constructors)\n\nThis is a **fundamental concept** that trips up many newcomers!\n\n### Method vs Associated Function\n\n| Feature | Method | Associated Function |\n|---------|--------|--------------------|\n| Has `self`? | ✅ Yes | ❌ No |\n| Needs instance? | ✅ Yes | ❌ No |\n| Call syntax | `instance.method()` | `Type::function()` |\n| Purpose | Operate on instance | Create or utility |\n\n### What is `new()`?\n\n```rust\nimpl Rectangle {\n    // No self parameter = Associated Function\n    fn new(width: u32, height: u32) -> Self {\n        Self { width, height }\n    }\n}\n```\n\nThis is Rust's **constructor pattern**. Unlike C++/Java/C#, Rust has no special `constructor` keyword.\n\n### How to Call It\n\n```rust\n// ✅ Correct: Use :: (path syntax)\nlet rect = Rectangle::new(10, 5);\n\n// ❌ Wrong: Cannot use dot notation\nlet rect = ???.new(10, 5);  // No instance exists yet!\n```\n\n### Coming from Other Languages\n\n| Language | How They Do It | Rust Equivalent |\n|----------|----------------|----------------|\n| C# | `new Rectangle(10, 5)` | `Rectangle::new(10, 5)` |\n| Java | `new Rectangle(10, 5)` | `Rectangle::new(10, 5)` |\n| Python | `Rectangle(10, 5)` | `Rectangle::new(10, 5)` |\n| C++ | `Rectangle(10, 5)` | `Rectangle::new(10, 5)` |\n\n### The `Self` Type\n\n`Self` refers to the implementing type:\n```rust\nimpl Rectangle {\n    fn new() -> Self { ... }  // Self = Rectangle\n}\n```\n\n### Common Constructor Variations\n\n```rust\nimpl Config {\n    fn new() -> Self { ... }           // Basic constructor\n    fn default() -> Self { ... }       // Default values\n    fn from_file(path: &str) -> Self { ... }  // From source\n    fn with_capacity(n: usize) -> Self { ... }  // Pre-allocated\n}\n```",
+			"confidence": 0.95,
+			"contexts": ["general"]
+		},
+		{
+			"id": "associated-function-general",
+			"pattern": "impl\\s+\\w+[^{]*\\{[^}]*fn\\s+\\w+\\s*\\([^)]*\\)",
+			"antiPattern": "fn\\s+\\w+\\s*\\([^)]*(&\\s*(mut\\s+)?)?self",
+			"hintLevel": "info",
+			"csTerms": ["static method", "class method", "utility function"],
+			"rustTerm": "Associated Function",
+			"explanation": "This function has no 'self' parameter - it's an ASSOCIATED FUNCTION (like a static method). Call it with :: syntax: Type::function()",
+			"example": "impl Circle {\n    fn unit() -> Self {\n        Self { radius: 1.0 }\n    }\n}\n// Called as: Circle::unit()",
+			"deepExplanation": "## Associated Functions\n\nAn **associated function** is a function inside an `impl` block that does NOT take `self`.\n\n### Think of It As...\n\n| Language | Rust Associated Function |\n|----------|-------------------------|\n| C# | `static` method |\n| Java | `static` method |\n| Python | `@staticmethod` or `@classmethod` |\n| C++ | `static` member function |\n\n### Example\n\n```rust\nimpl Circle {\n    // Associated function - no self\n    fn unit() -> Self {\n        Self { radius: 1.0 }\n    }\n    \n    // Also associated function\n    fn from_diameter(d: f64) -> Self {\n        Self { radius: d / 2.0 }\n    }\n    \n    // This IS a method - has &self\n    fn area(&self) -> f64 {\n        std::f64::consts::PI * self.radius.powi(2)\n    }\n}\n```\n\n### How to Call\n\n```rust\n// Associated functions: use ::\nlet c1 = Circle::unit();\nlet c2 = Circle::from_diameter(10.0);\n\n// Methods: use .\nlet area = c1.area();\n```\n\n### Common Uses\n\n**Constructors:**\n```rust\nVec::new()\nString::new()\nHashMap::new()\n```\n\n**Factory functions:**\n```rust\nPath::new(\"/tmp\")\nBox::new(value)\nRc::new(value)\n```\n\n**Utility functions:**\n```rust\nstd::mem::size_of::<T>()\nstd::iter::empty()\n```",
+			"confidence": 0.8,
+			"contexts": ["general"]
+		},
+		{
+			"id": "call-syntax-double-colon",
+			"pattern": "[A-Z]\\w*::\\w+\\s*\\(",
+			"antiPattern": "use |mod |crate::|super::|self::",
+			"hintLevel": "info",
+			"csTerms": ["static method call", "constructor call"],
+			"rustTerm": "Associated Function Call",
+			"explanation": "The :: syntax calls an ASSOCIATED FUNCTION on a type. This is like calling a static method or constructor - no instance needed.",
+			"example": "let s = String::new();       // Constructor\nlet v = Vec::with_capacity(10);  // Factory method\nlet n = i32::MAX;            // Associated constant",
+			"deepExplanation": "## The :: Syntax (Path Operator)\n\nWhen you see `Type::function()`, you're calling an **associated function**.\n\n### Examples You See Everywhere\n\n```rust\nString::new()           // Create empty String\nString::from(\"hello\")   // Create from &str\nVec::new()              // Create empty Vec\nVec::with_capacity(10)  // Create with pre-allocated space\nHashMap::new()          // Create empty HashMap\nBox::new(value)         // Heap allocate\nRc::new(value)          // Reference counted\nArc::new(value)         // Atomic reference counted\n```\n\n### Compare with Dot Notation\n\n```rust\n// :: = Associated function (no instance needed)\nlet s = String::new();\nlet v = Vec::with_capacity(100);\n\n// . = Method (needs an instance)\ns.push_str(\"hello\");\nv.push(42);\n```\n\n### Associated Constants Too!\n\n```rust\ni32::MAX        // 2147483647\ni32::MIN        // -2147483648\nf64::INFINITY   // Infinity\nf64::NAN        // Not a Number\n```\n\n### The Mental Model\n\n```\nType::thing()   →  \"Give me a thing FROM this type\"\ninstance.thing() →  \"Do something TO this instance\"\n```",
+			"confidence": 0.85,
+			"contexts": ["general"]
+		},
+		{
+			"id": "self-type-in-return",
+			"pattern": "->\\s*Self\\b",
+			"antiPattern": null,
+			"hintLevel": "info",
+			"csTerms": ["return type", "factory pattern", "fluent interface"],
+			"rustTerm": "Self Return Type",
+			"explanation": "Self refers to the implementing type. Returning Self is common in constructors and builder patterns for method chaining.",
+			"example": "impl Builder {\n    fn new() -> Self { ... }\n    fn option(self, opt: bool) -> Self { ... }\n}",
+			"deepExplanation": "## The `Self` Type\n\n`Self` (capital S) is an alias for \"the type we're implementing\".\n\n### Basic Usage\n\n```rust\nimpl Rectangle {\n    fn new(w: u32, h: u32) -> Self {\n        // Self = Rectangle here\n        Self { width: w, height: h }\n    }\n}\n```\n\n### Why Use Self Instead of the Type Name?\n\n1. **Less repetition:**\n```rust\n// Without Self\nimpl VeryLongTypeName {\n    fn new() -> VeryLongTypeName { VeryLongTypeName { } }\n}\n\n// With Self\nimpl VeryLongTypeName {\n    fn new() -> Self { Self { } }  // Much cleaner!\n}\n```\n\n2. **Works with generics:**\n```rust\nimpl<T> Container<T> {\n    fn new() -> Self {  // Self = Container<T>\n        Self { items: vec![] }\n    }\n}\n```\n\n### Builder Pattern with Self\n\n```rust\nimpl RequestBuilder {\n    fn new() -> Self {\n        Self { url: String::new(), headers: vec![] }\n    }\n    \n    fn url(mut self, url: &str) -> Self {\n        self.url = url.to_string();\n        self  // Return Self for chaining\n    }\n    \n    fn header(mut self, h: &str) -> Self {\n        self.headers.push(h.to_string());\n        self\n    }\n}\n\n// Fluent API:\nlet req = RequestBuilder::new()\n    .url(\"https://api.example.com\")\n    .header(\"Content-Type: application/json\");\n```\n\n### Note: self vs Self\n\n| Syntax | Meaning |\n|--------|--------|\n| `self` | The instance (like `this` in other languages) |\n| `Self` | The type itself |",
+			"confidence": 0.85,
+			"contexts": ["general"]
+		}
+	]
 }

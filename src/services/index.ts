@@ -1,7 +1,23 @@
-export { RustAnalyzerService, RustAnalyzerTypeInfo } from './rustAnalyzer';
-export { CargoAnalyzerService, DetectedDependencies } from './cargoAnalyzer';
-export { CompilerErrorLinker } from './compilerErrorLinker';
-export { PatternTracker, PatternStats, SessionSummary } from './patternTracker';
-export { IntentAnalyzer, intentAnalyzer, CodeIntent, TeachableMoment, ProjectType, FileIntent, BlockIntent } from './intentAnalyzer';
-export { RustDocsFetcher, rustDocsFetcher, FetchedDocContent } from './rustDocsFetcher';
-export { ExplanationSimplifier, explanationSimplifier, SimplifiedExplanation } from './explanationSimplifier';
+export { CargoAnalyzerService, DetectedDependencies } from "./cargoAnalyzer";
+export { CompilerErrorLinker } from "./compilerErrorLinker";
+export {
+	ExplanationSimplifier,
+	explanationSimplifier,
+	SimplifiedExplanation,
+} from "./explanationSimplifier";
+export {
+	BlockIntent,
+	CodeIntent,
+	FileIntent,
+	IntentAnalyzer,
+	intentAnalyzer,
+	ProjectType,
+	TeachableMoment,
+} from "./intentAnalyzer";
+export { PatternStats, PatternTracker, SessionSummary } from "./patternTracker";
+export { RustAnalyzerService, RustAnalyzerTypeInfo } from "./rustAnalyzer";
+export {
+	FetchedDocContent,
+	RustDocsFetcher,
+	rustDocsFetcher,
+} from "./rustDocsFetcher";
