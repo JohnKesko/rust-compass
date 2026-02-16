@@ -1,2 +1,2 @@
-export { RuleEngine } from './ruleEngine';
-export * from './types';
+export { RuleEngine } from "./ruleEngine";
+export * from "./types";

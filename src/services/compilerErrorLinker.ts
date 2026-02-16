@@ -88,9 +88,7 @@ export class CompilerErrorLinker implements vscode.Disposable {
 
 		// Watch for diagnostic changes (from rust-analyzer)
 		this.disposables.push(
-			vscode.languages.onDidChangeDiagnostics(
-				this.onDiagnosticsChanged.bind(this),
-			),
+			vscode.languages.onDidChangeDiagnostics(this.onDiagnosticsChanged.bind(this)),
 		);
 	}
 
@@ -122,10 +120,7 @@ export class CompilerErrorLinker implements vscode.Disposable {
 	/**
 	 * Check if a diagnostic matches a known error pattern
 	 */
-	private checkForLinkableError(
-		uri: vscode.Uri,
-		diagnostic: vscode.Diagnostic,
-	): void {
+	private checkForLinkableError(_uri: vscode.Uri, diagnostic: vscode.Diagnostic): void {
 		// Extract error code from diagnostic
 		const errorCode = this.extractErrorCode(diagnostic);
 		if (!errorCode) {

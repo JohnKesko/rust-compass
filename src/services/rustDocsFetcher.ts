@@ -64,9 +64,7 @@ export class RustDocsFetcher {
 						response.statusCode < 400 &&
 						response.headers.location
 					) {
-						this._fetchHtml(response.headers.location)
-							.then(resolve)
-							.catch(reject);
+						this._fetchHtml(response.headers.location).then(resolve).catch(reject);
 						return;
 					}
 
@@ -97,11 +95,7 @@ export class RustDocsFetcher {
 		// Determine page type from URL
 		if (url.includes("#method.")) {
 			return this._parseMethodDoc(html, url);
-		} else if (
-			url.includes("/struct.") ||
-			url.includes("/enum.") ||
-			url.includes("/trait.")
-		) {
+		} else if (url.includes("/struct.") || url.includes("/enum.") || url.includes("/trait.")) {
 			return this._parseTypeDoc(html, url);
 		} else if (url.includes("/macro.")) {
 			return this._parseMacroDoc(html, url);
@@ -149,9 +143,7 @@ export class RustDocsFetcher {
 		if (methodIndex !== -1) {
 			// Find the docblock after this method
 			const afterMethod = html.substring(methodIndex, methodIndex + 5000);
-			const docBlockMatch = afterMethod.match(
-				/<div class="docblock">([^]*?)<\/div>/i,
-			);
+			const docBlockMatch = afterMethod.match(/<div class="docblock">([^]*?)<\/div>/i);
 			if (docBlockMatch) {
 				description = this._cleanHtml(docBlockMatch[1]);
 				// Get first 2-3 sentences for conciseness
@@ -184,9 +176,7 @@ export class RustDocsFetcher {
 		let description = "";
 		const mainDocMatch =
 			html.match(/<div class="docblock item-decl">([^]*?)<\/div>/i) ||
-			html.match(
-				/<section[^>]*class="[^"]*docblock[^"]*"[^>]*>([^]*?)<\/section>/i,
-			);
+			html.match(/<section[^>]*class="[^"]*docblock[^"]*"[^>]*>([^]*?)<\/section>/i);
 		if (mainDocMatch) {
 			description = this._cleanHtml(mainDocMatch[1]);
 			description = this._truncateToSentences(description, 3);
@@ -231,10 +221,7 @@ export class RustDocsFetcher {
 	/**
 	 * Parse keyword documentation
 	 */
-	private _parseKeywordDoc(
-		html: string,
-		url: string,
-	): FetchedDocContent | null {
+	private _parseKeywordDoc(html: string, url: string): FetchedDocContent | null {
 		const keywordMatch = url.match(/keyword\.(\w+)\.html/);
 		const keyword = keywordMatch ? keywordMatch[1] : "keyword";
 
@@ -259,10 +246,7 @@ export class RustDocsFetcher {
 	/**
 	 * Generic doc parsing fallback
 	 */
-	private _parseGenericDoc(
-		html: string,
-		url: string,
-	): FetchedDocContent | null {
+	private _parseGenericDoc(html: string, url: string): FetchedDocContent | null {
 		// Try to get the page title
 		let title = "Rust Documentation";
 		const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
@@ -352,31 +336,22 @@ export class RustDocsFetcher {
 		// Handle common patterns
 		const patterns: Record<string, string> = {
 			// Iterator methods
-			for_each:
-				"https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.for_each",
+			for_each: "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.for_each",
 			map: "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.map",
-			filter:
-				"https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.filter",
+			filter: "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.filter",
 			fold: "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.fold",
-			collect:
-				"https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.collect",
+			collect: "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.collect",
 			next: "https://doc.rust-lang.org/std/iter/trait.Iterator.html#tymethod.next",
-			peekable:
-				"https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.peekable",
-			enumerate:
-				"https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.enumerate",
+			peekable: "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.peekable",
+			enumerate: "https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.enumerate",
 			iter: "https://doc.rust-lang.org/std/iter/trait.IntoIterator.html",
 			into_iter: "https://doc.rust-lang.org/std/iter/trait.IntoIterator.html",
 
 			// Option/Result
-			unwrap:
-				"https://doc.rust-lang.org/std/option/enum.Option.html#method.unwrap",
-			expect:
-				"https://doc.rust-lang.org/std/option/enum.Option.html#method.expect",
-			unwrap_or:
-				"https://doc.rust-lang.org/std/option/enum.Option.html#method.unwrap_or",
-			ok_or:
-				"https://doc.rust-lang.org/std/option/enum.Option.html#method.ok_or",
+			unwrap: "https://doc.rust-lang.org/std/option/enum.Option.html#method.unwrap",
+			expect: "https://doc.rust-lang.org/std/option/enum.Option.html#method.expect",
+			unwrap_or: "https://doc.rust-lang.org/std/option/enum.Option.html#method.unwrap_or",
+			ok_or: "https://doc.rust-lang.org/std/option/enum.Option.html#method.ok_or",
 			Option: "https://doc.rust-lang.org/std/option/enum.Option.html",
 			Result: "https://doc.rust-lang.org/std/result/enum.Result.html",
 			Some: "https://doc.rust-lang.org/std/option/enum.Option.html#variant.Some",
@@ -402,8 +377,7 @@ export class RustDocsFetcher {
 			Copy: "https://doc.rust-lang.org/std/marker/trait.Copy.html",
 			Drop: "https://doc.rust-lang.org/std/ops/trait.Drop.html",
 			Iterator: "https://doc.rust-lang.org/std/iter/trait.Iterator.html",
-			IntoIterator:
-				"https://doc.rust-lang.org/std/iter/trait.IntoIterator.html",
+			IntoIterator: "https://doc.rust-lang.org/std/iter/trait.IntoIterator.html",
 			From: "https://doc.rust-lang.org/std/convert/trait.From.html",
 			Into: "https://doc.rust-lang.org/std/convert/trait.Into.html",
 			AsRef: "https://doc.rust-lang.org/std/convert/trait.AsRef.html",

@@ -1,4 +1,4 @@
-import * as path from "path";
+import * as path from "node:path";
 import * as vscode from "vscode";
 
 /**
@@ -21,25 +21,8 @@ export interface DetectedDependencies {
  */
 const DEPENDENCY_PATTERNS: Record<keyof DetectedDependencies, string[]> = {
 	async: ["tokio", "async-std", "smol", "futures", "async-trait"],
-	web: [
-		"actix-web",
-		"actix-rt",
-		"axum",
-		"warp",
-		"rocket",
-		"hyper",
-		"reqwest",
-		"tower",
-	],
-	serialization: [
-		"serde",
-		"serde_json",
-		"serde_yaml",
-		"toml",
-		"ron",
-		"bincode",
-		"postcard",
-	],
+	web: ["actix-web", "actix-rt", "axum", "warp", "rocket", "hyper", "reqwest", "tower"],
+	serialization: ["serde", "serde_json", "serde_yaml", "toml", "ron", "bincode", "postcard"],
 	cli: ["clap", "structopt", "argh", "pico-args", "lexopt"],
 	parsing: ["nom", "pest", "lalrpop", "logos", "chumsky", "winnow", "combine"],
 	error: ["anyhow", "thiserror", "eyre", "color-eyre", "miette"],
@@ -54,12 +37,10 @@ const DEPENDENCY_PATTERNS: Record<keyof DetectedDependencies, string[]> = {
 export class CargoAnalyzerService {
 	private static instance: CargoAnalyzerService;
 	private cachedDependencies: DetectedDependencies | null = null;
-	private cachedCargoPath: string | null = null;
 	private fileWatcher: vscode.FileSystemWatcher | null = null;
 
 	// Event emitter for dependency changes
-	private _onDependenciesChanged =
-		new vscode.EventEmitter<DetectedDependencies>();
+	private _onDependenciesChanged = new vscode.EventEmitter<DetectedDependencies>();
 	public readonly onDependenciesChanged = this._onDependenciesChanged.event;
 
 	public static getInstance(): CargoAnalyzerService {
@@ -74,8 +55,7 @@ export class CargoAnalyzerService {
 	 */
 	public async initialize(): Promise<void> {
 		// Watch for Cargo.toml changes
-		this.fileWatcher =
-			vscode.workspace.createFileSystemWatcher("**/Cargo.toml");
+		this.fileWatcher = vscode.workspace.createFileSystemWatcher("**/Cargo.toml");
 		this.fileWatcher.onDidChange(() => this.invalidateCache());
 		this.fileWatcher.onDidCreate(() => this.invalidateCache());
 		this.fileWatcher.onDidDelete(() => this.invalidateCache());
@@ -97,9 +77,7 @@ export class CargoAnalyzerService {
 	/**
 	 * Check if a specific category of dependencies is used
 	 */
-	public async hasCategory(
-		category: keyof DetectedDependencies,
-	): Promise<boolean> {
+	public async hasCategory(category: keyof DetectedDependencies): Promise<boolean> {
 		const deps = await this.getDependencies();
 		return deps[category].length > 0;
 	}
@@ -191,19 +169,14 @@ export class CargoAnalyzerService {
 			parts.push(`💻 CLI: ${deps.cli.join(", ")}`);
 		}
 
-		return parts.length > 0
-			? parts.join("\n")
-			: "No notable dependencies detected";
+		return parts.length > 0 ? parts.join("\n") : "No notable dependencies detected";
 	}
 
 	/**
 	 * Scan Cargo.toml files in the workspace
 	 */
 	private async scanDependencies(): Promise<void> {
-		const cargoFiles = await vscode.workspace.findFiles(
-			"**/Cargo.toml",
-			"**/target/**",
-		);
+		const cargoFiles = await vscode.workspace.findFiles("**/Cargo.toml", "**/target/**");
 
 		if (cargoFiles.length === 0) {
 			this.cachedDependencies = this.emptyDependencies();
@@ -213,12 +186,8 @@ export class CargoAnalyzerService {
 		// Use the first Cargo.toml found (usually the root one)
 		// Sort to prioritize root Cargo.toml
 		const sortedFiles = cargoFiles.sort(
-			(a, b) =>
-				a.fsPath.split(path.sep).length - b.fsPath.split(path.sep).length,
+			(a, b) => a.fsPath.split(path.sep).length - b.fsPath.split(path.sep).length,
 		);
-
-		const cargoPath = sortedFiles[0].fsPath;
-		this.cachedCargoPath = cargoPath;
 
 		try {
 			const content = await vscode.workspace.fs.readFile(sortedFiles[0]);
@@ -265,19 +234,16 @@ export class CargoAnalyzerService {
 	/**
 	 * Categorize a dependency into the appropriate category
 	 */
-	private categorizeDependency(
-		depName: string,
-		deps: DetectedDependencies,
-	): void {
+	private categorizeDependency(depName: string, deps: DetectedDependencies): void {
 		for (const [category, patterns] of Object.entries(DEPENDENCY_PATTERNS)) {
-			if (category === "other") continue;
+			if (category === "other") {
+				continue;
+			}
 
 			for (const pattern of patterns) {
 				// Check if dep name matches or starts with the pattern
 				if (depName === pattern || depName.startsWith(pattern + "-")) {
-					(deps[category as keyof DetectedDependencies] as string[]).push(
-						depName,
-					);
+					(deps[category as keyof DetectedDependencies] as string[]).push(depName);
 					return;
 				}
 			}

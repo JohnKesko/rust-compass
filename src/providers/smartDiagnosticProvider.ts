@@ -10,12 +10,8 @@ export class SmartDiagnosticProvider implements vscode.Disposable {
 	private diagnosticCollection: vscode.DiagnosticCollection;
 	private disposables: vscode.Disposable[] = [];
 	private debounceTimer: NodeJS.Timeout | null = null;
-	private ruleEngine: RuleEngine;
-
-	constructor(ruleEngine: RuleEngine) {
-		this.ruleEngine = ruleEngine;
-		this.diagnosticCollection =
-			vscode.languages.createDiagnosticCollection("rust-compass");
+	constructor(_ruleEngine: RuleEngine) {
+		this.diagnosticCollection = vscode.languages.createDiagnosticCollection("rust-compass");
 
 		// Analyze on document change (debounced)
 		this.disposables.push(

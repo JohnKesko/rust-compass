@@ -207,9 +207,11 @@ export class RustAnalyzerService {
 		position: vscode.Position,
 	): Promise<vscode.Location | undefined> {
 		try {
-			const definitions = await vscode.commands.executeCommand<
-				vscode.Location[]
-			>("vscode.executeDefinitionProvider", document.uri, position);
+			const definitions = await vscode.commands.executeCommand<vscode.Location[]>(
+				"vscode.executeDefinitionProvider",
+				document.uri,
+				position,
+			);
 
 			return definitions?.[0];
 		} catch {
@@ -226,17 +228,13 @@ export class RustAnalyzerService {
 	): Promise<boolean> {
 		// Simple heuristic: look backwards for loop keywords
 		const text = document.getText(
-			new vscode.Range(
-				new vscode.Position(Math.max(0, position.line - 20), 0),
-				position,
-			),
+			new vscode.Range(new vscode.Position(Math.max(0, position.line - 20), 0), position),
 		);
 
 		// Count open braces and loop keywords
 		const loopPattern = /\b(for|while|loop)\b[^{]*\{/g;
 		let loopCount = 0;
-		let match;
-		while ((match = loopPattern.exec(text)) !== null) {
+		while (loopPattern.exec(text) !== null) {
 			loopCount++;
 		}
 

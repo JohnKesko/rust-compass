@@ -1,4 +1,4 @@
-export { RustHoverProvider } from './hoverProvider';
-export { RustDecorationProvider } from './decorationProvider';
-export { RustCodeActionProvider } from './codeActionProvider';
-export { SmartDiagnosticProvider } from './smartDiagnosticProvider';
+export { RustCodeActionProvider } from "./codeActionProvider";
+export { RustDecorationProvider } from "./decorationProvider";
+export { RustHoverProvider } from "./hoverProvider";
+export { SmartDiagnosticProvider } from "./smartDiagnosticProvider";

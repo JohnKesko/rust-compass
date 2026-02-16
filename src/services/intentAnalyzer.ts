@@ -91,9 +91,7 @@ export class IntentAnalyzer {
 
 		// Check file names in src/
 		const srcFiles = await vscode.workspace.findFiles("src/**/*.rs", null, 50);
-		const fileNames = srcFiles.map(
-			(f) => f.path.split("/").pop()?.toLowerCase() || "",
-		);
+		const fileNames = srcFiles.map((f) => f.path.split("/").pop()?.toLowerCase() || "");
 
 		this.projectTypeCache = this.inferProjectTypeFromFiles(fileNames);
 		return this.projectTypeCache;
@@ -106,11 +104,21 @@ export class IntentAnalyzer {
 		const nameMatch = nameLower.match(/name\s*=\s*"([^"]+)"/);
 		if (nameMatch) {
 			const name = nameMatch[1];
-			if (name.includes("parser") || name.includes("parse")) return "parser";
-			if (name.includes("lexer") || name.includes("lex")) return "lexer";
-			if (name.includes("compiler") || name.includes("lang")) return "compiler";
-			if (name.includes("cli") || name.includes("cmd")) return "cli";
-			if (name.includes("server") || name.includes("api")) return "web-server";
+			if (name.includes("parser") || name.includes("parse")) {
+				return "parser";
+			}
+			if (name.includes("lexer") || name.includes("lex")) {
+				return "lexer";
+			}
+			if (name.includes("compiler") || name.includes("lang")) {
+				return "compiler";
+			}
+			if (name.includes("cli") || name.includes("cmd")) {
+				return "cli";
+			}
+			if (name.includes("server") || name.includes("api")) {
+				return "web-server";
+			}
 		}
 
 		// Check dependencies
@@ -151,20 +159,16 @@ export class IntentAnalyzer {
 				f.includes("tokenizer") ||
 				f.includes("scanner"),
 		);
-		const hasParser = fileNames.some(
-			(f) => f.includes("parser") || f.includes("parse"),
-		);
-		const hasAst = fileNames.some(
-			(f) =>
-				f.includes("ast") ||
-				f.includes("node") ||
-				f.includes("tree") ||
-				f.includes("syntax"),
-		);
-
-		if (hasLexer && hasParser) return "compiler";
-		if (hasLexer) return "lexer";
-		if (hasParser) return "parser";
+		const hasParser = fileNames.some((f) => f.includes("parser") || f.includes("parse"));
+		if (hasLexer && hasParser) {
+			return "compiler";
+		}
+		if (hasLexer) {
+			return "lexer";
+		}
+		if (hasParser) {
+			return "parser";
+		}
 
 		return "unknown";
 	}
@@ -187,11 +191,7 @@ export class IntentAnalyzer {
 		if (fileName.includes("parser") || fileName.includes("parse")) {
 			return "parser";
 		}
-		if (
-			fileName.includes("ast") ||
-			fileName.includes("node") ||
-			fileName.includes("tree")
-		) {
+		if (fileName.includes("ast") || fileName.includes("node") || fileName.includes("tree")) {
 			return "ast";
 		}
 		if (fileName.includes("token")) {
@@ -203,11 +203,7 @@ export class IntentAnalyzer {
 		if (fileName.includes("main.rs")) {
 			return "main-entry";
 		}
-		if (
-			fileName.includes("test") ||
-			fileName.includes("_test") ||
-			fileName.includes("tests")
-		) {
+		if (fileName.includes("test") || fileName.includes("_test") || fileName.includes("tests")) {
 			return "tests";
 		}
 		if (fileName.includes("util") || fileName.includes("helper")) {
@@ -246,10 +242,7 @@ export class IntentAnalyzer {
 	/**
 	 * Analyze a specific code block/function to understand what it's doing
 	 */
-	analyzeBlock(
-		document: vscode.TextDocument,
-		position: vscode.Position,
-	): BlockIntent {
+	analyzeBlock(document: vscode.TextDocument, position: vscode.Position): BlockIntent {
 		// Get the surrounding function/block
 		const text = document.getText();
 		const offset = document.offsetAt(position);
@@ -262,8 +255,6 @@ export class IntentAnalyzer {
 			return "unknown";
 		}
 
-		// Get function body (approximate - find matching brace)
-		const fnStart = beforeCursor.lastIndexOf(fnMatch[0]);
 		const fnName = fnMatch[1].toLowerCase();
 
 		// Get a reasonable chunk around the cursor
@@ -316,10 +307,7 @@ export class IntentAnalyzer {
 			return "error-handling";
 		}
 
-		if (
-			context.includes("state") ||
-			(context.includes("enum ") && context.includes("mode"))
-		) {
+		if (context.includes("state") || (context.includes("enum ") && context.includes("mode"))) {
 			return "state-machine";
 		}
 
@@ -341,10 +329,7 @@ export class IntentAnalyzer {
 			let match;
 			while ((match = charsNextPattern.exec(text)) !== null) {
 				// Check if there's a .next() nearby but no .peekable()
-				const after = text.substring(
-					match.index,
-					Math.min(text.length, match.index + 200),
-				);
+				const after = text.substring(match.index, Math.min(text.length, match.index + 200));
 				if (after.includes(".next()") && !after.includes(".peekable()")) {
 					const pos = document.positionAt(match.index);
 					moments.push({
@@ -362,29 +347,14 @@ export class IntentAnalyzer {
 			// Find iterator patterns that might need peek
 			const iterNextPattern = /let\s+\w+\s*=\s*\w+\.next\(\)/g;
 			while ((match = iterNextPattern.exec(text)) !== null) {
-				const lineStart = text.lastIndexOf("\n", match.index) + 1;
-				const lineEnd = text.indexOf("\n", match.index);
-				const line = text.substring(
-					lineStart,
-					lineEnd > 0 ? lineEnd : text.length,
-				);
-
 				// Check if we're in a loop or conditional that suggests looking ahead
-				const before = text.substring(
-					Math.max(0, match.index - 100),
-					match.index,
-				);
-				if (
-					before.includes("while") ||
-					before.includes("loop") ||
-					before.includes("if ")
-				) {
+				const before = text.substring(Math.max(0, match.index - 100), match.index);
+				if (before.includes("while") || before.includes("loop") || before.includes("if ")) {
 					const pos = document.positionAt(match.index);
 					moments.push({
 						range: new vscode.Range(pos, pos.translate(0, match[0].length)),
 						intent: "looking-ahead",
-						suggestion:
-							"Need to look ahead? .peek() lets you see without consuming",
+						suggestion: "Need to look ahead? .peek() lets you see without consuming",
 						ruleId: "iterator-next-without-peekable",
 						severity: "hint",
 						contextReason: "Using .next() in a loop - might need to peek first",
@@ -445,8 +415,7 @@ export class IntentAnalyzer {
 			moments.push({
 				range: new vscode.Range(pos, pos.translate(0, match[0].length)),
 				intent: "api-design",
-				suggestion:
-					"Function takes String - consider &str for more flexibility",
+				suggestion: "Function takes String - consider &str for more flexibility",
 				ruleId: "string-vs-str",
 				severity: "hint",
 				contextReason: "Function parameter uses String instead of &str",

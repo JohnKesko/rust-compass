@@ -51,18 +51,11 @@ export class RuleEngine {
 		console.log(`Total rules loaded: ${this.rules.length}`);
 	}
 
-	public findMatches(
-		document: vscode.TextDocument,
-		context: ProjectContext,
-	): RuleMatch[] {
+	public findMatches(document: vscode.TextDocument, context: ProjectContext): RuleMatch[] {
 		// Check cache first
 		const cacheKey = document.uri.toString();
 		const cached = this.matchCache.get(cacheKey);
-		if (
-			cached &&
-			cached.version === document.version &&
-			cached.context === context
-		) {
+		if (cached && cached.version === document.version && cached.context === context) {
 			return cached.matches;
 		}
 
@@ -71,10 +64,7 @@ export class RuleEngine {
 
 		for (const rule of this.rules) {
 			// Filter by context
-			if (
-				!rule.contexts.includes(context) &&
-				!rule.contexts.includes("general")
-			) {
+			if (!rule.contexts.includes(context) && !rule.contexts.includes("general")) {
 				continue;
 			}
 
@@ -128,9 +118,7 @@ export class RuleEngine {
 		const matches = this.findMatches(document, context);
 		const offset = document.offsetAt(position);
 
-		return matches.find(
-			(m) => offset >= m.range.start && offset <= m.range.end,
-		);
+		return matches.find((m) => offset >= m.range.start && offset <= m.range.end);
 	}
 
 	public getRuleById(id: string): Rule | undefined {

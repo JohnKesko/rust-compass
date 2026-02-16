@@ -1,1 +1,1 @@
-export { LearnPanel } from './learnPanel';
+export { LearnPanel } from "./learnPanel";
